@@ -145,3 +145,77 @@ test("AdapterHost removes executable providers before adapter stop begins", asyn
   assert.equal(host.tools.has("drain.tool", "drain-adapter"), false);
   assert.equal(host.registry.has("drain-adapter"), false);
 });
+
+test("AdapterHost builds context only from explicit adapters and excludes sensitive fragments by default", async () => {
+  const host = new AdapterHost();
+
+  await host.mount({
+    id: "context-a",
+    version: "0.1.0",
+    async capabilities() {
+      return manifest("context-a");
+    },
+    context() {
+      return [
+        {
+          id: "public",
+          async build() {
+            return {
+              providerId: "public",
+              kind: "project-summary",
+              content: { project: "A" },
+            };
+          },
+        },
+        {
+          id: "secret",
+          async build() {
+            return {
+              providerId: "secret",
+              kind: "private-config",
+              content: { token: "hidden" },
+              sensitive: true,
+            };
+          },
+        },
+      ];
+    },
+  });
+
+  await host.mount({
+    id: "context-b",
+    version: "0.1.0",
+    async capabilities() {
+      return manifest("context-b");
+    },
+    context() {
+      return [
+        {
+          id: "other",
+          async build() {
+            return {
+              providerId: "other",
+              kind: "project-summary",
+              content: { project: "B" },
+            };
+          },
+        },
+      ];
+    },
+  });
+
+  const safe = await host.buildContext(
+    { purpose: "agent-planning" },
+    { adapterIds: ["context-a"] },
+  );
+  assert.deepEqual(safe.map((fragment) => fragment.providerId), ["public"]);
+
+  const explicitSensitive = await host.buildContext(
+    { purpose: "human-review" },
+    { adapterIds: ["context-a"], includeSensitive: true },
+  );
+  assert.deepEqual(
+    explicitSensitive.map((fragment) => fragment.providerId).sort(),
+    ["public", "secret"],
+  );
+});
