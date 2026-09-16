@@ -6,6 +6,13 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const packageNames = ["approval","artifacts","events","policy","tools","validation","changesets","agent","mcp","model-openai-compatible","cli","transactions","adapter-sdk","hmi-adapter-kit","harness"];
+const packageImports = packageNames.map((name) => `@axrail/${name}`);
+const advancedImports = [
+  "@axrail/adapter-sdk/host",
+  "@axrail/adapter-sdk/registry",
+  "@axrail/adapter-sdk/context-registry",
+];
+const publicImports = [...packageImports, ...advancedImports];
 const work = await mkdtemp(join(tmpdir(), "axrail-pack-smoke-"));
 const retainedTarballDir = process.env.AXRAIL_ARTIFACT_DIR
   ? resolve(root, process.env.AXRAIL_ARTIFACT_DIR)
@@ -60,12 +67,11 @@ try {
     },
   );
 
-  const imports = packageNames.map((name) => `@axrail/${name}`);
-  const smokeSource = `const packages = ${JSON.stringify(imports)};\nfor (const name of packages) {\n  const value = await import(name);\n  if (!value || typeof value !== "object") throw new Error(\`Package import failed: \${name}\`);\n  console.log(\`import ok: \${name}\`);\n}\n`;
+  const smokeSource = `const packages = ${JSON.stringify(publicImports)};\nfor (const name of packages) {\n  const value = await import(name);\n  if (!value || typeof value !== "object") throw new Error(\`Package import failed: \${name}\`);\n  console.log(\`import ok: \${name}\`);\n}\n`;
   await writeFile(join(consumer, "smoke.mjs"), smokeSource);
   execFileSync(process.execPath, ["smoke.mjs"], { cwd: consumer, stdio: "inherit" });
 
-  await writeTypeConsumer(imports);
+  await writeTypeConsumer(publicImports);
   const consumerTsc = join(consumer, "node_modules", "typescript", "bin", "tsc");
   execFileSync(process.execPath, [consumerTsc, "-p", "tsconfig.json"], {
     cwd: consumer,
@@ -77,7 +83,7 @@ try {
     : join(consumer, "node_modules", ".bin", "axrail");
   execFileSync(cliBin, ["--version"], { cwd: consumer, stdio: "inherit" });
 
-  console.log(`Axrail package smoke passed for ${packageNames.length} packages, including TypeScript declarations and dependency closure.`);
+  console.log(`Axrail package smoke passed for ${packageNames.length} packages and ${advancedImports.length} advanced subpaths, including TypeScript declarations and dependency closure.`);
   if (retainedTarballDir) {
     console.log(`Retained package tarballs at ${retainedTarballDir}`);
   }
