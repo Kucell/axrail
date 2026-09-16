@@ -47,7 +47,10 @@ export interface ApprovalRequest {
 export interface ApprovalDecision {
   readonly requestId: string;
   readonly decision: ApprovalDecisionKind;
+  /** Convenience for single-principal providers. */
   readonly approver?: ApprovalPrincipal;
+  /** Aggregated principals for quorum/multi-party approval providers. */
+  readonly approvers?: readonly ApprovalPrincipal[];
   readonly reason?: string;
   readonly decidedAt: string;
   readonly evidenceDigest?: string;
