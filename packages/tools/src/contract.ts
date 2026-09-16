@@ -31,6 +31,8 @@ export interface ToolDefinition<TInput = unknown, TOutput = unknown> {
   readonly description: string;
   readonly risk: ToolRiskLevel;
   readonly effect: ToolEffect;
+  readonly inputSchema?: unknown;
+  readonly outputSchema?: unknown;
   readonly timeoutMs?: number;
   readonly idempotent?: boolean;
   validateInput?(input: unknown): TInput;

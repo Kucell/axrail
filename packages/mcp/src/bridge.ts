@@ -69,6 +69,8 @@ export class McpToolBridge {
         `MCP tool ${descriptor.name} from ${this.options.client.serverId}`,
       risk: classification.risk,
       effect: classification.effect,
+      inputSchema: descriptor.inputSchema,
+      outputSchema: descriptor.outputSchema,
       idempotent: classification.idempotent,
       timeoutMs: this.options.timeoutMs,
       execute: (input, context) =>
