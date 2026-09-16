@@ -2,6 +2,7 @@ import {
   ToolRegistry,
   type ToolDefinition,
 } from "@axrail/tools";
+import { mcpToolDescriptorFingerprint } from "./fingerprint.js";
 import { mcpToolName } from "./naming.js";
 import { createDefaultMcpRiskResolver } from "./risk.js";
 import type {
@@ -16,6 +17,7 @@ export class McpToolBridge {
   private readonly options: McpBridgeOptions;
   private readonly registry: ToolRegistry;
   private readonly bridged = new Map<string, BridgedMcpTool>();
+  private readonly fingerprints = new Map<string, string>();
 
   constructor(registry: ToolRegistry, options: McpBridgeOptions) {
     this.registry = registry;
@@ -30,13 +32,29 @@ export class McpToolBridge {
       if (!discovered.has(remoteName)) {
         tool.dispose();
         this.bridged.delete(remoteName);
+        this.fingerprints.delete(remoteName);
       }
     }
 
     for (const descriptor of remoteTools) {
-      if (this.bridged.has(descriptor.name)) continue;
+      const fingerprint = mcpToolDescriptorFingerprint(descriptor);
+      const existing = this.bridged.get(descriptor.name);
+      const previousFingerprint = this.fingerprints.get(descriptor.name);
+
+      if (existing && previousFingerprint === fingerprint) continue;
+
+      // A same-name remote Tool may change schema, annotations, description or
+      // metadata over time. The old registration must not retain stale risk or
+      // validation semantics after the remote descriptor changes.
+      if (existing) {
+        existing.dispose();
+        this.bridged.delete(descriptor.name);
+        this.fingerprints.delete(descriptor.name);
+      }
+
       const bridged = this.registerDescriptor(descriptor);
       this.bridged.set(descriptor.name, bridged);
+      this.fingerprints.set(descriptor.name, fingerprint);
     }
 
     return [...this.bridged.values()];
@@ -49,6 +67,7 @@ export class McpToolBridge {
   dispose(): void {
     for (const tool of this.bridged.values()) tool.dispose();
     this.bridged.clear();
+    this.fingerprints.clear();
   }
 
   private registerDescriptor(descriptor: McpToolDescriptor): BridgedMcpTool {
@@ -63,6 +82,7 @@ export class McpToolBridge {
 
     const definition: ToolDefinition<unknown, unknown> = {
       name: localName,
+      providerId: this.options.client.serverId,
       description:
         descriptor.description ??
         descriptor.title ??
