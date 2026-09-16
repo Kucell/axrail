@@ -232,12 +232,18 @@ export class ToolRuntime {
       evidenceDigest: invocation.evidenceDigest,
     }, invocation);
 
+    const executionController = new AbortController();
+    const unlinkCallerAbort = linkAbortSignal(context.signal, executionController);
+
     try {
       const execution = Promise.resolve(
-        tool.execute(invocation.input, executionContext(invocation, context.signal)),
+        tool.execute(
+          invocation.input,
+          executionContext(invocation, executionController.signal),
+        ),
       );
       const value = tool.timeoutMs
-        ? await withTimeout(execution, tool.timeoutMs)
+        ? await withTimeout(execution, tool.timeoutMs, executionController)
         : await execution;
       if (tool.validateResult) await tool.validateResult(value);
       const result: ToolResult = { ok: true, value };
@@ -249,9 +255,41 @@ export class ToolRuntime {
       }, invocation);
       return result;
     } catch (error) {
+      if (error instanceof ToolTimeoutError) {
+        const effectUncertain = invocation.effect !== "read";
+        const retrySafe = invocation.effect === "read" || tool.idempotent === true;
+        const code = effectUncertain ? "execution_uncertain" : "timeout";
+        const result = failure(
+          code,
+          effectUncertain
+            ? `Tool timed out after ${error.timeoutMs}ms; side-effect outcome is uncertain`
+            : `Tool timed out after ${error.timeoutMs}ms`,
+          {
+            timeoutMs: error.timeoutMs,
+            abortRequested: true,
+            effectUncertain,
+            retrySafe,
+          },
+        );
+        await this.emit("tool.execution.timed_out", call, context, result.error, invocation);
+        await this.emit("tool.execution.failed", call, context, result.error, invocation);
+        return result;
+      }
+
+      if (context.signal?.aborted) {
+        const result = failure("cancelled", "Tool execution was cancelled", {
+          effectUncertain: invocation.effect !== "read",
+          retrySafe: invocation.effect === "read" || tool.idempotent === true,
+        });
+        await this.emit("tool.execution.cancelled", call, context, result.error, invocation);
+        return result;
+      }
+
       const result = failure("execution_failed", messageOf(error));
       await this.emit("tool.execution.failed", call, context, result.error, invocation);
       return result;
+    } finally {
+      unlinkCallerAbort();
     }
   }
 
@@ -335,21 +373,50 @@ function metadataString(
   return typeof value === "string" && value ? value : undefined;
 }
 
-function failure(code: string, message: string): ToolResult {
-  return { ok: false, error: { code, message } };
+function failure(code: string, message: string, details?: unknown): ToolResult {
+  return { ok: false, error: { code, message, details } };
 }
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+class ToolTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`Tool timed out after ${timeoutMs}ms`);
+    this.name = "ToolTimeoutError";
+  }
+}
+
+function linkAbortSignal(
+  parent: AbortSignal | undefined,
+  child: AbortController,
+): () => void {
+  if (!parent) return () => undefined;
+  if (parent.aborted) {
+    child.abort(parent.reason);
+    return () => undefined;
+  }
+  const abort = () => child.abort(parent.reason);
+  parent.addEventListener("abort", abort, { once: true });
+  return () => parent.removeEventListener("abort", abort);
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  controller: AbortController,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutError = new ToolTimeoutError(timeoutMs);
   try {
     return await Promise.race([
       promise,
       new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`Tool timed out after ${timeoutMs}ms`)), timeoutMs);
+        timer = setTimeout(() => {
+          controller.abort(timeoutError);
+          reject(timeoutError);
+        }, timeoutMs);
       }),
     ]);
   } finally {
