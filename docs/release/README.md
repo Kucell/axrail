@@ -2,7 +2,7 @@
 
 This directory is the release-readiness entry point for Axrail v0.1.
 
-Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, and a final pre-release architecture review has now been completed.
+Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, and the final pre-release architecture Gate has passed focused re-review.
 
 ## Current state
 
@@ -16,11 +16,11 @@ Pack/install smoke #16            ✓ Node 20/22/24 / closed
 Frozen pnpm lockfile              ✓ enforced
 v0.1 lockstep version model       ✓ approved
 0.1.0-rc.1 no-publish dry run     ✓ package/runtime smoke green
-Pre-release architecture #21      ✗ P1 release gate open
+Pre-release architecture #21      ✓ focused re-review passed / closed
 Version/release automation #18    ◐ publication mechanics remain open
 ```
 
-**Public npm/GitHub release is currently NO-GO until Issue #21 is closed and re-reviewed.**
+**Architecture release Gate: GO. Axrail remains unpublished until #18's explicit publication mechanics and maintainer publish decision are completed.**
 
 No Axrail package has been published to an npm registry by this work.
 
@@ -31,8 +31,10 @@ No Axrail package has been published to an npm registry by this work.
 - [`v0.1-build-strategy-analysis.md`](v0.1-build-strategy-analysis.md) — approved build architecture analysis.
 - [`v0.1-package-graph.md`](v0.1-package-graph.md) — package dependency topology, build layers, and clean-consumer smoke matrix.
 - [`v0.1-versioning-release-policy.md`](v0.1-versioning-release-policy.md) — approved v0.1 versioning/tag/release policy.
+- [`../execution-semantics.md`](../execution-semantics.md) — safety-relevant runtime boundary semantics for observers, timeout uncertainty, Adapter Policy isolation, and consumer verification.
 - [`../../CHANGELOG.md`](../../CHANGELOG.md) — human-readable release-note source of truth.
-- `Kucell/axrail-agent/ARCHITECTURE_REVIEW_PRE_RELEASE_2026-09-16.md` — final pre-release architecture review and release verdict.
+- `Kucell/axrail-agent/ARCHITECTURE_REVIEW_PRE_RELEASE_2026-09-16.md` — pre-release review that opened #21.
+- `Kucell/axrail-agent/ARCHITECTURE_REVIEW_PRE_RELEASE_RECHECK_2026-09-16.md` — focused re-review that cleared #21.
 
 ## Approved development decisions
 
@@ -64,7 +66,9 @@ pnpm check
         ↓
 tsc -b project-reference build
         ↓
-65 behavioral tests
+69 behavioral tests
+        ↓
+dependency-closure audit over emitted .js/.d.ts
         ↓
 pnpm pack all 15 public packages
         ↓
@@ -72,27 +76,27 @@ clean npm consumer install
         ↓
 import every public package root
         ↓
+strict NodeNext TypeScript consumer compile
+        ↓
 packaged axrail --version
 ```
 
-This runtime/package smoke is green on Node 20, 22 and 24, and package tarballs include Apache-2.0 license text.
+CI #206 / Actions run `35090615025` passed the full flow on Node 20, 22 and 24. The packaged CLI reports `0.1.0-rc.1`.
 
-The pre-release architecture review found one additional release-verification gap: the clean consumer must also compile representative TypeScript against the packed `.d.ts` files with `skipLibCheck: false`, and package dependency closure must be verified without relying on all 15 tarballs being installed together. This is tracked by #21.
+## Final pre-release architecture Gate #21 — PASSED
 
-## Pre-release architecture gate #21
+The focused re-review closed the four release blockers:
 
-The release is blocked until these four P1 findings are closed and rechecked:
+1. Transaction lifecycle observers are observational and cannot relabel an already committed effect.
+2. Tool timeout uses cooperative timeout-scoped cancellation and returns explicit `timeout` / `execution_uncertain` semantics.
+3. Adapter Policy providers are Host-scoped and multi-Adapter Transactions evaluate every Adapter policy scope with conservative aggregation.
+4. Packed artifacts pass strict downstream TypeScript declaration compilation and emitted dependency-closure verification.
 
-1. Transaction lifecycle observers must not change already-committed outcome semantics.
-2. Tool timeout must model/cancel effect uncertainty instead of returning an ordinary execution failure while the Tool may still run.
-3. Adapter Policy providers need Host-enforced scope and complete multi-Adapter Transaction policy coverage (or v0.1 must fail-closed prohibit multi-Adapter Transactions).
-4. Packed artifacts need downstream TypeScript/declaration and dependency-closure consumer verification.
-
-After implementation, Node 20/22/24 build/tests/package smoke plus a focused architecture re-review must pass before publication work resumes.
+No new P1 regression was found in the focused re-review. Remaining architecture hardening is tracked as non-blocking follow-up rather than a release Gate.
 
 ## Remaining publication work
 
-Issue #18 remains open for publication mechanics and is downstream of #21:
+Issue #18 remains open for publication mechanics only:
 
 - Git tag and GitHub Release creation workflow;
 - npm authentication via repository environments/secrets;
@@ -111,7 +115,8 @@ Release hardening must not weaken governed execution in order to make packaging 
 - Provider ambiguity remains fail-closed;
 - Policy obligations and approval quorum remain enforced;
 - strict audit profiles retain pre-effect/pre-commit checkpoints;
-- Adapter/validator/provider scoping remains explicit;
+- Adapter/validator/policy/provider scoping remains explicit;
+- timeout of a side-effecting Tool means effect uncertainty, not proven absence of effect;
 - L4/L5 risk floors are not build-time configuration options.
 
 A package that installs correctly but bypasses these runtime guarantees is not a valid Axrail release artifact.
