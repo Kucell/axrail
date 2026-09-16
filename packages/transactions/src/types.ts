@@ -43,6 +43,7 @@ export interface TransactionRecord {
   readonly updatedAt: string;
   readonly context: TransactionContext;
   readonly baselineVersions: Readonly<Record<string, string | undefined>>;
+  readonly approvedEvidenceDigest?: string;
   readonly validation?: ValidationResult;
   readonly error?: TransactionFailure;
 }
@@ -58,6 +59,8 @@ export type TransactionFailureCode =
   | "policy_denied"
   | "approval_unavailable"
   | "approval_denied"
+  | "approval_evidence_missing"
+  | "approval_evidence_mismatch"
   | "validation_failed"
   | "version_conflict"
   | "artifact_unavailable"
@@ -77,8 +80,15 @@ export interface TransactionPolicyEvaluator {
   evaluate(transaction: TransactionRecord): Promise<TransactionPolicyDecision> | TransactionPolicyDecision;
 }
 
+export interface TransactionApprovalResult {
+  readonly approved: boolean;
+  readonly evidenceDigest?: string;
+}
+
 export interface TransactionApprovalProvider {
-  approve(transaction: TransactionRecord): Promise<boolean> | boolean;
+  approve(
+    transaction: TransactionRecord,
+  ): Promise<TransactionApprovalResult> | TransactionApprovalResult;
 }
 
 export interface TransactionApplyResult {
