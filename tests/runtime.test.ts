@@ -222,15 +222,6 @@ test("EventStore preserves append order and replays session state", async () => 
 
 test("AdapterHost cleans up partial registrations after mount failure", async () => {
   const host = new AdapterHost();
-  host.tools.register({
-    name: "collision.tool",
-    description: "Existing tool",
-    risk: "L0",
-    effect: "read",
-    execute() {
-      return null;
-    },
-  });
 
   const adapter = {
     id: "cleanup-adapter",
@@ -254,8 +245,8 @@ test("AdapterHost cleans up partial registrations after mount failure", async ()
           },
         },
         {
-          name: "collision.tool",
-          description: "Will collide",
+          name: "temporary.tool",
+          description: "Duplicate semantic Tool from the same Adapter provider",
           risk: "L0" as const,
           effect: "read" as const,
           execute() {
@@ -266,7 +257,10 @@ test("AdapterHost cleans up partial registrations after mount failure", async ()
     },
   };
 
-  await assert.rejects(() => host.mount(adapter), /Tool already registered/);
+  await assert.rejects(
+    () => host.mount(adapter),
+    /Tool provider already registered/,
+  );
   assert.equal(host.tools.has("temporary.tool"), false);
   assert.equal(host.registry.has("cleanup-adapter"), false);
 });
