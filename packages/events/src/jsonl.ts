@@ -143,7 +143,7 @@ export class JsonlEventStore implements EventStore {
     try {
       text = await readFile(this.path, "utf8");
     } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") return [];
+      if (isErrorWithCode(error) && error.code === "ENOENT") return [];
       throw error;
     }
 
@@ -207,7 +207,7 @@ function matchesQuery(event: StoredAxrailEvent, query: EventQuery): boolean {
   return true;
 }
 
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+function isErrorWithCode(error: unknown): error is Error & { readonly code?: string } {
   return error instanceof Error && "code" in error;
 }
 
