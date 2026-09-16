@@ -19,25 +19,22 @@ const packages = {
   transactions: { description: "Governed engineering transaction runtime for Axrail.", deps: { "@axrail/approval": "workspace:*", "@axrail/artifacts": "workspace:*", "@axrail/changesets": "workspace:*", "@axrail/policy": "workspace:*", "@axrail/validation": "workspace:*" } },
   "adapter-sdk": { description: "Vendor-neutral engineering-system Adapter SDK for Axrail.", deps: { "@axrail/approval": "workspace:*", "@axrail/artifacts": "workspace:*", "@axrail/policy": "workspace:*", "@axrail/tools": "workspace:*", "@axrail/transactions": "workspace:*", "@axrail/validation": "workspace:*" } },
   "hmi-adapter-kit": { description: "Vendor-neutral HMI domain Adapter kit for Axrail.", deps: { "@axrail/adapter-sdk": "workspace:*", "@axrail/artifacts": "workspace:*", "@axrail/tools": "workspace:*" } },
-  harness: { description: "Primary embeddable governed execution Harness for Axrail.", deps: { "@axrail/adapter-sdk": "workspace:*", "@axrail/agent": "workspace:*", "@axrail/approval": "workspace:*", "@axrail/events": "workspace:*", "@axrail/policy": "workspace:*", "@axrail/tools": "workspace:*", "@axrail/transactions": "workspace:*" } },
+  harness: { description: "Primary embeddable governed execution Harness for Axrail.", deps: { "@axrail/adapter-sdk": "workspace:*", "@axrail/agent": "workspace:*", "@axrail/approval": "workspace:*", "@axrail/events": "workspace:*", "@axrail/policy": "workspace:*", "@axrail/tools": "workspace:*", "@axrail/transactions": "workspace:*" } }
 };
 
 const references = {
   approval: [], artifacts: [], events: [], policy: [], tools: [], validation: [],
-  changesets: ["artifacts"],
-  agent: ["tools"],
-  mcp: ["tools"],
-  "model-openai-compatible": ["agent"],
-  cli: ["changesets", "events"],
+  changesets: ["artifacts"], agent: ["tools"], mcp: ["tools"],
+  "model-openai-compatible": ["agent"], cli: ["changesets", "events"],
   transactions: ["approval", "artifacts", "changesets", "policy", "validation"],
   "adapter-sdk": ["approval", "artifacts", "policy", "tools", "transactions", "validation"],
   "hmi-adapter-kit": ["adapter-sdk", "artifacts", "tools"],
-  harness: ["adapter-sdk", "agent", "approval", "events", "policy", "tools", "transactions"],
+  harness: ["adapter-sdk", "agent", "approval", "events", "policy", "tools", "transactions"]
 };
 
 const sourcePaths = Object.fromEntries([
   ...Object.keys(packages).map((name) => [`@axrail/${name}`, [`packages/${name}/src/index.ts`]]),
-  ["@axrail/core", ["packages/core/src/index.ts"]],
+  ["@axrail/core", ["packages/core/src/index.ts"]]
 ]);
 
 await writeJson("package.json", {
@@ -95,7 +92,7 @@ await writeJson("tsconfig.build.json", {
 });
 
 for (const [name, config] of Object.entries(packages)) {
-  const manifest = {
+  await writeJson(`packages/${name}/package.json`, {
     name: `@axrail/${name}`,
     version,
     description: config.description,
@@ -118,10 +115,9 @@ for (const [name, config] of Object.entries(packages)) {
     },
     ...(config.bin ? { bin: config.bin } : {}),
     ...(Object.keys(config.deps).length ? { dependencies: config.deps } : {})
-  };
-  await writeJson(`packages/${name}/package.json`, manifest);
+  });
 
-  const buildConfig = {
+  await writeJson(`packages/${name}/tsconfig.build.json`, {
     extends: "../../tsconfig.build.base.json",
     compilerOptions: {
       rootDir: "./src",
@@ -132,16 +128,13 @@ for (const [name, config] of Object.entries(packages)) {
     ...(references[name].length
       ? { references: references[name].map((dep) => ({ path: `../${dep}/tsconfig.build.json` })) }
       : {})
-  };
-  await writeJson(`packages/${name}/tsconfig.build.json`, buildConfig);
+  });
 }
 
-await writeText("scripts/release/pack-smoke.mjs", `import { execFileSync } from "node:child_process";\nimport { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";\nimport { tmpdir } from "node:os";\nimport { join } from "node:path";\nimport { fileURLToPath } from "node:url";\n\nconst root = fileURLToPath(new URL("../../", import.meta.url));\nconst packageNames = ${JSON.stringify(Object.keys(packages))};\nconst work = await mkdtemp(join(tmpdir(), "axrail-pack-smoke-"));\nconst tarballs = join(work, "tarballs");\nconst consumer = join(work, "consumer");\nawait mkdir(tarballs, { recursive: true });\nawait mkdir(consumer, { recursive: true });\n\ntry {\n  for (const name of packageNames) {\n    execFileSync("pnpm", ["pack", "--pack-destination", tarballs], { cwd: join(root, "packages", name), stdio: "inherit" });\n  }\n  const archives = (await readdir(tarballs)).filter((name) => name.endsWith(".tgz")).sort().map((name) => join(tarballs, name));\n  if (archives.length !== packageNames.length) throw new Error(\`Expected \${packageNames.length} package tarballs, found \${archives.length}\`);\n  await writeFile(join(consumer, "package.json"), JSON.stringify({ name: "axrail-release-smoke-consumer", private: true, type: "module" }, null, 2) + "\\n");\n  execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", ...archives], { cwd: consumer, stdio: "inherit" });\n  const imports = packageNames.map((name) => \`@axrail/\${name}\`);\n  await writeFile(join(consumer, "smoke.mjs"), \`const packages = \${JSON.stringify(imports)};\\nfor (const name of packages) { const value = await import(name); if (!value || typeof value !== "object") throw new Error(\\\`Package import failed: \\${name}\\\`); console.log(\\\`import ok: \\${name}\\\`); }\\n\`);\n  execFileSync(process.execPath, ["smoke.mjs"], { cwd: consumer, stdio: "inherit" });\n  const cliBin = process.platform === "win32" ? join(consumer, "node_modules", ".bin", "axrail.cmd") : join(consumer, "node_modules", ".bin", "axrail");\n  execFileSync(cliBin, ["--version"], { cwd: consumer, stdio: "inherit" });\n  console.log(\`Axrail package smoke passed for \${packageNames.length} packages.\`);\n} finally {\n  if (process.env.AXRAIL_KEEP_SMOKE !== "1") await rm(work, { recursive: true, force: true });\n  else console.log(\`Kept smoke workspace at \${work}\`);\n}\n`);
-
-await writeText(".github/workflows/ci.yml", `name: CI\n\non:\n  push:\n  pull_request:\n\njobs:\n  verify:\n    name: verify-node-\${{ matrix.node }}\n    runs-on: ubuntu-latest\n    strategy:\n      fail-fast: false\n      matrix:\n        node: [20, 22, 24]\n    steps:\n      - uses: actions/checkout@v4\n      - uses: pnpm/action-setup@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: \${{ matrix.node }}\n          cache: pnpm\n      - run: pnpm install --frozen-lockfile\n      - run: pnpm check\n      - run: pnpm test\n      - run: pnpm pack:smoke\n`);
-
 const ignore = await readFile(join(root, ".gitignore"), "utf8");
-if (!ignore.includes(".tsbuild/")) await writeText(".gitignore", `${ignore.trimEnd()}\n.tsbuild/\n`);
+if (!ignore.includes(".tsbuild/")) {
+  await writeText(".gitignore", `${ignore.trimEnd()}\n.tsbuild/\n`);
+}
 
 async function writeJson(path, value) {
   await writeText(path, `${JSON.stringify(value, null, 2)}\n`);
