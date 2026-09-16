@@ -35,6 +35,11 @@ import {
   type TransactionRecord,
   type TransactionRuntimeOptions,
 } from "@axrail/transactions";
+import {
+  requiresAuditBeforeCommit,
+  requiresAuditBeforeEffect,
+  type AuditFailurePolicy,
+} from "./audit.js";
 import { HarnessAgent, type HarnessAgentOptions } from "./agent.js";
 
 export interface HarnessRuntimeOptions {
@@ -43,6 +48,7 @@ export interface HarnessRuntimeOptions {
   readonly eventStore?: EventStore;
   readonly approval?: ApprovalService;
   readonly environment?: string;
+  readonly auditPolicy?: AuditFailurePolicy;
   readonly now?: () => string;
   readonly idFactory?: (prefix: string) => string;
 }
@@ -61,6 +67,7 @@ export class HarnessRuntime {
   readonly tools: ToolRuntime;
   readonly approval?: ApprovalService;
   readonly environment?: string;
+  readonly auditPolicy: AuditFailurePolicy;
 
   private readonly now: () => string;
   private readonly idFactory: (prefix: string) => string;
@@ -70,6 +77,7 @@ export class HarnessRuntime {
     this.events = options.eventStore ?? new InMemoryEventStore();
     this.approval = options.approval;
     this.environment = options.environment;
+    this.auditPolicy = options.auditPolicy ?? "best_effort";
     this.now = options.now ?? (() => new Date().toISOString());
     this.idFactory = options.idFactory ?? defaultIdFactory;
     this.sessions = new SessionService({
@@ -83,6 +91,9 @@ export class HarnessRuntime {
       registry: this.adapters.tools,
       policy: new HarnessToolPolicy(this),
       approval: this.approval ? new HarnessToolApproval(this) : undefined,
+      beforeExecute: requiresAuditBeforeEffect(this.auditPolicy)
+        ? (invocation) => this.recordToolAuditCheckpoint(invocation)
+        : undefined,
       now: this.now,
       onEvent: (event) => this.recordToolEvent(event),
     });
@@ -125,12 +136,19 @@ export class HarnessRuntime {
             correlationId: transaction.context.correlationId,
           },
         }),
+      beforeApply: requiresAuditBeforeEffect(this.auditPolicy)
+        ? (transaction) => this.recordTransactionAuditCheckpoint("effect", transaction)
+        : undefined,
+      beforeCommit: requiresAuditBeforeCommit(this.auditPolicy)
+        ? (transaction) => this.recordTransactionAuditCheckpoint("commit", transaction)
+        : undefined,
       onEvent: async (event, transaction) => {
         await this.recordTransactionEvent(event, transaction);
         try {
           await options.onEvent?.(event, transaction);
         } catch {
-          // Observer instrumentation is non-authoritative in v0.1.
+          // Observer instrumentation remains non-authoritative. Strict audit
+          // guarantees are enforced by the explicit checkpoints above.
         }
       },
     });
@@ -204,6 +222,58 @@ export class HarnessRuntime {
     return this.now();
   }
 
+  private async recordToolAuditCheckpoint(
+    invocation: ToolInvocationEnvelope,
+  ): Promise<void> {
+    await this.events.append({
+      id: this.nextId("evt"),
+      type: "audit.effect.checkpoint",
+      version: "1",
+      time: this.currentTime(),
+      sessionId: invocation.context.sessionId,
+      transactionId: invocation.context.transactionId,
+      toolCallId: invocation.callId,
+      artifactRefs: invocation.artifactRefs,
+      actor: principalFromActorId(invocation.context.actorId),
+      source: "harness-audit",
+      correlationId: metadataString(invocation.context.metadata, "correlationId"),
+      data: {
+        auditPolicy: this.auditPolicy,
+        toolName: invocation.toolName,
+        providerId: invocation.providerId,
+        evidenceDigest: invocation.evidenceDigest,
+        target: invocation.target,
+        risk: invocation.risk,
+        effect: invocation.effect,
+      },
+    });
+  }
+
+  private async recordTransactionAuditCheckpoint(
+    phase: "effect" | "commit",
+    transaction: TransactionRecord,
+  ): Promise<void> {
+    await this.events.append({
+      id: this.nextId("evt"),
+      type: phase === "commit" ? "audit.commit.checkpoint" : "audit.effect.checkpoint",
+      version: "1",
+      time: this.currentTime(),
+      sessionId: transaction.context.sessionId,
+      transactionId: transaction.id,
+      changeSetId: transaction.changeSet.id,
+      artifactRefs: transaction.changeSet.artifacts.map((artifact) => artifact.id),
+      actor: principalFromTransaction(transaction),
+      source: "harness-audit",
+      correlationId: transaction.context.correlationId,
+      data: {
+        auditPolicy: this.auditPolicy,
+        phase,
+        mode: transaction.mode,
+        approvedEvidenceDigest: transaction.approvedEvidenceDigest,
+      },
+    });
+  }
+
   private async recordToolEvent(event: ToolRuntimeEvent): Promise<void> {
     try {
       await this.events.append({
@@ -220,14 +290,15 @@ export class HarnessRuntime {
         correlationId: event.correlationId,
         data: {
           toolName: event.toolName,
+          providerId: event.providerId,
           evidenceDigest: event.evidenceDigest,
           target: event.target,
           detail: event.data,
         },
       });
     } catch {
-      // Event instrumentation remains observational until durable-audit mode is
-      // explicitly enabled by a future Harness profile.
+      // Ordinary lifecycle events are observational. Strict profiles enforce
+      // durable guarantees through explicit checkpoints before side effects.
     }
   }
 
@@ -256,8 +327,7 @@ export class HarnessRuntime {
         },
       });
     } catch {
-      // See recordToolEvent. Durable fail-closed auditing belongs to an explicit
-      // deployment profile rather than changing transaction semantics silently.
+      // See recordToolEvent. Strict guarantees are provided by checkpoints.
     }
   }
 }
@@ -377,6 +447,14 @@ function principalFromTransaction(transaction: TransactionRecord): EventPrincipa
         displayName: actor.displayName,
       }
     : undefined;
+}
+
+function metadataString(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): string | undefined {
+  const value = metadata?.[key];
+  return typeof value === "string" && value ? value : undefined;
 }
 
 function defaultIdFactory(prefix: string): string {
