@@ -23,6 +23,7 @@ export async function createToolInvocationEnvelope<TInput>(
   const base = {
     callId: call.id,
     toolName: tool.name,
+    toolDescription: tool.description,
     toolVersion: tool.version,
     providerId: tool.providerId,
     risk: tool.risk,
