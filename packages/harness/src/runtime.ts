@@ -21,8 +21,7 @@ import type { PolicyInput } from "@axrail/policy";
 import {
   ToolRuntime,
   type ToolApprovalProvider,
-  type ToolDefinition,
-  type ToolExecutionContext,
+  type ToolInvocationEnvelope,
   type ToolPolicyDecision,
   type ToolPolicyEvaluator,
   type ToolRuntimeEvent,
@@ -157,27 +156,43 @@ export class HarnessRuntime {
     });
   }
 
-  toolPolicyInput(
-    tool: ToolDefinition<unknown, unknown>,
-    context: ToolExecutionContext,
-  ): PolicyInput {
+  toolPolicyInput(invocation: ToolInvocationEnvelope): PolicyInput {
     return {
-      action: tool.name,
-      actor: context.actorId ? { id: context.actorId, type: "user" } : undefined,
-      risk: tool.risk,
-      environment: metadataString(context.metadata, "environment") ?? this.environment,
-      capability: tool.name,
+      action: invocation.toolName,
+      actor: invocation.context.actorId
+        ? { id: invocation.context.actorId, type: "user" }
+        : undefined,
+      risk: invocation.risk,
+      environment: invocation.context.environment ?? this.environment,
+      adapterId: invocation.providerId,
+      capability: invocation.toolName,
+      resource: invocation.target
+        ? {
+            id: invocation.target,
+            provider: invocation.providerId,
+            metadata: invocation.artifactRefs
+              ? { artifactRefs: invocation.artifactRefs }
+              : undefined,
+          }
+        : undefined,
       facts: {
-        effect: tool.effect,
-        sessionId: context.sessionId,
-        transactionId: context.transactionId,
+        effect: invocation.effect,
+        sessionId: invocation.context.sessionId,
+        transactionId: invocation.context.transactionId,
+        evidenceDigest: invocation.evidenceDigest,
+        effectiveInput: invocation.input,
+        artifactRefs: invocation.artifactRefs,
+        toolVersion: invocation.toolVersion,
+        providerId: invocation.providerId,
       },
     };
   }
 
-  toolApprovalPrincipal(context: ToolExecutionContext): ApprovalPrincipal | undefined {
-    return context.actorId
-      ? { id: context.actorId, type: "human" }
+  toolApprovalPrincipal(
+    invocation: ToolInvocationEnvelope,
+  ): ApprovalPrincipal | undefined {
+    return invocation.context.actorId
+      ? { id: invocation.context.actorId, type: "human" }
       : undefined;
   }
 
@@ -199,11 +214,14 @@ export class HarnessRuntime {
         sessionId: event.sessionId,
         transactionId: event.transactionId,
         toolCallId: event.callId,
+        artifactRefs: event.artifactRefs,
         actor: principalFromActorId(event.actorId),
         source: "tool-runtime",
         correlationId: event.correlationId,
         data: {
           toolName: event.toolName,
+          evidenceDigest: event.evidenceDigest,
+          target: event.target,
           detail: event.data,
         },
       });
@@ -248,23 +266,23 @@ class HarnessToolPolicy implements ToolPolicyEvaluator {
   constructor(private readonly harness: HarnessRuntime) {}
 
   async evaluate(
-    tool: ToolDefinition<unknown, unknown>,
-    _call: { readonly id: string; readonly name: string; readonly input: unknown },
-    context: ToolExecutionContext,
+    invocation: ToolInvocationEnvelope,
   ): Promise<ToolPolicyDecision> {
     const providers = this.harness.adapters.policy.list();
 
     if (providers.length === 0) {
-      if (tool.risk === "L0" || tool.risk === "L1") return { allow: true };
+      if (invocation.risk === "L0" || invocation.risk === "L1") {
+        return { allow: true };
+      }
       return {
         allow: false,
         code: "policy_unavailable",
-        reason: `No policy provider is registered for privileged tool ${tool.name} (${tool.risk})`,
+        reason: `No policy provider is registered for privileged tool ${invocation.toolName} (${invocation.risk})`,
       };
     }
 
     const decision = await this.harness.adapters.policy.evaluate(
-      this.harness.toolPolicyInput(tool, context),
+      this.harness.toolPolicyInput(invocation),
     );
 
     if (decision.effect === "deny") {
@@ -286,28 +304,39 @@ class HarnessToolPolicy implements ToolPolicyEvaluator {
 class HarnessToolApproval implements ToolApprovalProvider {
   constructor(private readonly harness: HarnessRuntime) {}
 
-  async approve(
-    tool: ToolDefinition<unknown, unknown>,
-    call: { readonly id: string; readonly name: string; readonly input: unknown },
-    context: ToolExecutionContext,
-  ): Promise<boolean> {
+  async approve(invocation: ToolInvocationEnvelope): Promise<boolean> {
     if (!this.harness.approval) return false;
 
     const request = {
       id: this.harness.nextId("approval"),
-      transactionId: context.transactionId,
-      toolCallId: call.id,
-      actor: this.harness.toolApprovalPrincipal(context),
+      transactionId: invocation.context.transactionId,
+      toolCallId: invocation.callId,
+      actor: this.harness.toolApprovalPrincipal(invocation),
       operation: {
-        action: tool.name,
-        description: tool.description,
-        metadata: { effect: tool.effect },
+        action: invocation.toolName,
+        target: invocation.target,
+        description: invocation.toolDescription,
+        metadata: {
+          effect: invocation.effect,
+          providerId: invocation.providerId,
+          toolVersion: invocation.toolVersion,
+        },
       },
-      risk: tool.risk,
-      reason: `Policy requires approval for ${tool.name}`,
+      risk: invocation.risk,
+      reason: `Policy requires approval for ${invocation.toolName}`,
+      evidence: {
+        metadata: {
+          toolName: invocation.toolName,
+          providerId: invocation.providerId,
+          toolVersion: invocation.toolVersion,
+          artifactRefs: invocation.artifactRefs,
+          invocation: invocation.descriptionMetadata,
+        },
+      },
+      evidenceDigest: invocation.evidenceDigest,
       metadata: {
-        sessionId: context.sessionId,
-        environment: metadataString(context.metadata, "environment") ?? this.harness.environment,
+        sessionId: invocation.context.sessionId,
+        environment: invocation.context.environment ?? this.harness.environment,
       },
     } as const;
 
@@ -346,14 +375,6 @@ function principalFromTransaction(transaction: TransactionRecord): EventPrincipa
         displayName: actor.displayName,
       }
     : undefined;
-}
-
-function metadataString(
-  metadata: Readonly<Record<string, unknown>> | undefined,
-  key: string,
-): string | undefined {
-  const value = metadata?.[key];
-  return typeof value === "string" && value ? value : undefined;
 }
 
 function defaultIdFactory(prefix: string): string {
