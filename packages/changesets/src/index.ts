@@ -1,1 +1,2 @@
-export type ChangeSet = { readonly id: string; readonly intent: string };
+export * from "./model.js";
+export * from "./inspect.js";
