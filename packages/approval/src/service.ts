@@ -95,7 +95,12 @@ export class CallbackApprovalProvider implements ApprovalProvider {
     private readonly callback: (request: ApprovalRequest) => Promise<ApprovalDecision> | ApprovalDecision,
   ) {}
 
-  requestApproval(request: ApprovalRequest): Promise<ApprovalDecision> {
-    return Promise.resolve(this.callback(request));
+  async requestApproval(request: ApprovalRequest): Promise<ApprovalDecision> {
+    const decision = await this.callback(request);
+    if (!request.evidenceDigest || decision.evidenceDigest) return decision;
+    return {
+      ...decision,
+      evidenceDigest: request.evidenceDigest,
+    };
   }
 }
