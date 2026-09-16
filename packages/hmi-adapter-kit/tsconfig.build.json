@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "../../.tsbuild/hmi-adapter-kit.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../adapter-sdk/tsconfig.build.json"
+    },
+    {
+      "path": "../artifacts/tsconfig.build.json"
+    },
+    {
+      "path": "../tools/tsconfig.build.json"
+    }
+  ]
+}

@@ -1,15 +1,22 @@
 {
   "name": "axrail",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0-rc.1",
   "description": "Transactional AI execution for industrial and engineering software.",
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.6.5",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "axrail": "tsx packages/cli/src/bin.ts",
     "check": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts"
+    "build": "tsc -b tsconfig.build.json",
+    "clean": "tsc -b tsconfig.build.json --clean",
+    "test:unit": "tsx --test tests/*.test.ts",
+    "test": "pnpm build && pnpm test:unit",
+    "pack:smoke": "node scripts/release/pack-smoke.mjs",
+    "release:dry-run": "pnpm check && pnpm test && pnpm pack:smoke"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

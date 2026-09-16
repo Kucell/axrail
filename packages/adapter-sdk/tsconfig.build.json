@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "../../.tsbuild/adapter-sdk.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../approval/tsconfig.build.json"
+    },
+    {
+      "path": "../artifacts/tsconfig.build.json"
+    },
+    {
+      "path": "../policy/tsconfig.build.json"
+    },
+    {
+      "path": "../tools/tsconfig.build.json"
+    },
+    {
+      "path": "../transactions/tsconfig.build.json"
+    },
+    {
+      "path": "../validation/tsconfig.build.json"
+    }
+  ]
+}

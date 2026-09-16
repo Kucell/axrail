@@ -1,0 +1,50 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/approval/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/artifacts/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/events/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/policy/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/tools/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/validation/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/changesets/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/agent/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/mcp/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/model-openai-compatible/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/cli/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/transactions/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/adapter-sdk/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/hmi-adapter-kit/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/harness/tsconfig.build.json"
+    }
+  ]
+}

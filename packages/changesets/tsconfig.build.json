@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "../../.tsbuild/changesets.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../artifacts/tsconfig.build.json"
+    }
+  ]
+}

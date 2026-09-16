@@ -4,7 +4,61 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@axrail/approval": [
+        "packages/approval/src/index.ts"
+      ],
+      "@axrail/artifacts": [
+        "packages/artifacts/src/index.ts"
+      ],
+      "@axrail/events": [
+        "packages/events/src/index.ts"
+      ],
+      "@axrail/policy": [
+        "packages/policy/src/index.ts"
+      ],
+      "@axrail/tools": [
+        "packages/tools/src/index.ts"
+      ],
+      "@axrail/validation": [
+        "packages/validation/src/index.ts"
+      ],
+      "@axrail/changesets": [
+        "packages/changesets/src/index.ts"
+      ],
+      "@axrail/agent": [
+        "packages/agent/src/index.ts"
+      ],
+      "@axrail/mcp": [
+        "packages/mcp/src/index.ts"
+      ],
+      "@axrail/model-openai-compatible": [
+        "packages/model-openai-compatible/src/index.ts"
+      ],
+      "@axrail/cli": [
+        "packages/cli/src/index.ts"
+      ],
+      "@axrail/transactions": [
+        "packages/transactions/src/index.ts"
+      ],
+      "@axrail/adapter-sdk": [
+        "packages/adapter-sdk/src/index.ts"
+      ],
+      "@axrail/hmi-adapter-kit": [
+        "packages/hmi-adapter-kit/src/index.ts"
+      ],
+      "@axrail/harness": [
+        "packages/harness/src/index.ts"
+      ],
+      "@axrail/core": [
+        "packages/core/src/index.ts"
+      ]
+    }
   },
-  "include": ["packages/*/src/**/*.ts", "examples/*/src/**/*.ts"]
+  "include": [
+    "packages/*/src/**/*.ts",
+    "examples/*/src/**/*.ts"
+  ]
 }

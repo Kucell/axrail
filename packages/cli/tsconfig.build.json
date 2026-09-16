@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "../../.tsbuild/cli.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../changesets/tsconfig.build.json"
+    },
+    {
+      "path": "../events/tsconfig.build.json"
+    }
+  ]
+}

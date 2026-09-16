@@ -1,10 +1,35 @@
 {
   "name": "@axrail/harness",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0-rc.1",
+  "description": "Primary embeddable governed execution Harness for Axrail.",
+  "license": "Apache-2.0",
   "type": "module",
-  "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kucell/axrail.git",
+    "directory": "packages/harness"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "clean": "tsc -b tsconfig.build.json --clean"
+  },
   "dependencies": {
     "@axrail/adapter-sdk": "workspace:*",
     "@axrail/agent": "workspace:*",
@@ -13,6 +38,5 @@
     "@axrail/policy": "workspace:*",
     "@axrail/tools": "workspace:*",
     "@axrail/transactions": "workspace:*"
-  },
-  "scripts": { "test": "node --input-type=module -e \"\"" }
+  }
 }

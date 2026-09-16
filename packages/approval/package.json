@@ -1,9 +1,33 @@
 {
   "name": "@axrail/approval",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0-rc.1",
+  "description": "Approval contracts and evidence-bound approval runtime for Axrail.",
+  "license": "Apache-2.0",
   "type": "module",
-  "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "node --input-type=module -e \"\"" }
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kucell/axrail.git",
+    "directory": "packages/approval"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "clean": "tsc -b tsconfig.build.json --clean"
+  }
 }
