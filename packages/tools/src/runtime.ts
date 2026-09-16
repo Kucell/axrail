@@ -8,11 +8,17 @@ import type {
 import { createToolInvocationEnvelope } from "./invocation.js";
 import { ToolRegistry } from "./registry.js";
 
+export interface ToolPolicyObligation {
+  readonly type: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+}
+
 export interface ToolPolicyDecision {
   readonly allow: boolean;
   readonly code?: "policy_unavailable" | "policy_denied";
   readonly reason?: string;
   readonly requireApproval?: boolean;
+  readonly obligations?: readonly ToolPolicyObligation[];
 }
 
 export interface ToolPolicyEvaluator {
@@ -121,11 +127,15 @@ export class ToolRuntime {
       ? await this.policy.evaluate(invocation)
       : { allow: true };
 
+    const highRiskApprovalRequired = invocation.risk === "L4" || invocation.risk === "L5";
+    const approvalRequired = Boolean(decision.requireApproval) || highRiskApprovalRequired;
+
     await this.emit("tool.policy.evaluated", call, context, {
       allow: decision.allow,
       code: decision.code,
-      requireApproval: decision.requireApproval ?? false,
+      requireApproval: approvalRequired,
       reason: decision.reason,
+      obligations: decision.obligations,
       risk: tool.risk,
       evidenceDigest: invocation.evidenceDigest,
     }, invocation);
@@ -139,11 +149,32 @@ export class ToolRuntime {
       return result;
     }
 
-    if (decision.requireApproval) {
+    const obligationError = enforceToolObligations(invocation, decision.obligations);
+    if (obligationError) {
+      const result = failure("policy_obligation_unsatisfied", obligationError);
+      await this.emit("tool.policy.obligation_failed", call, context, {
+        message: obligationError,
+        obligations: decision.obligations,
+      }, invocation);
+      await this.emit("tool.execution.failed", call, context, result.error, invocation);
+      return result;
+    }
+
+    if (invocation.risk === "L5" && !invocation.context.transactionId) {
+      const result = failure(
+        "transaction_required",
+        "L5 safety-critical Tool execution requires an explicit transaction boundary",
+      );
+      await this.emit("tool.execution.failed", call, context, result.error, invocation);
+      return result;
+    }
+
+    if (approvalRequired) {
       await this.emit("tool.approval.requested", call, context, {
         risk: tool.risk,
         evidenceDigest: invocation.evidenceDigest,
         target: invocation.target,
+        highRiskFloor: highRiskApprovalRequired,
       }, invocation);
       if (!this.approval) {
         const result = failure(
@@ -228,6 +259,31 @@ export class ToolRuntime {
       // can impose fail-closed persistence at the Harness/commit boundary.
     }
   }
+}
+
+function enforceToolObligations(
+  invocation: ToolInvocationEnvelope,
+  obligations: readonly ToolPolicyObligation[] | undefined,
+): string | undefined {
+  for (const obligation of obligations ?? []) {
+    switch (obligation.type) {
+      case "require-transaction":
+        if (!invocation.context.transactionId) {
+          return "Policy obligation require-transaction is not satisfied";
+        }
+        break;
+      case "require-environment": {
+        const expected = obligation.parameters?.environment ?? obligation.parameters?.value;
+        if (typeof expected !== "string" || invocation.context.environment !== expected) {
+          return `Policy obligation require-environment is not satisfied (expected ${String(expected)})`;
+        }
+        break;
+      }
+      default:
+        return `Unsupported policy obligation: ${obligation.type}`;
+    }
+  }
+  return undefined;
 }
 
 function executionContext(
