@@ -1,6 +1,10 @@
 import type { ApprovalProvider } from "@axrail/approval";
 import { ArtifactProviderRegistry } from "@axrail/artifacts";
-import { PolicyEngine } from "@axrail/policy";
+import {
+  PolicyEngine,
+  type PolicyInput,
+  type PolicyProvider,
+} from "@axrail/policy";
 import { ToolRegistry, type ToolDefinition } from "@axrail/tools";
 import { ValidationPipeline, type Validator } from "@axrail/validation";
 import { AdapterContextRegistry } from "./context-registry.js";
@@ -113,10 +117,11 @@ export class AdapterHost {
 
       const policyProviderIds: string[] = [];
       for (const provider of adapter.policies?.() ?? []) {
-        this.policy.register(provider);
-        policyProviderIds.push(provider.id);
+        const bound = bindAdapterPolicy(adapter.id, provider);
+        this.policy.register(bound);
+        policyProviderIds.push(bound.id);
         disposers.push(() => {
-          this.policy.unregister(provider.id);
+          this.policy.unregister(bound.id);
         });
       }
 
@@ -256,6 +261,23 @@ function bindAdapterValidator(
   return Object.freeze({
     ...validator,
     providerId: adapterId,
+  });
+}
+
+function bindAdapterPolicy(
+  adapterId: string,
+  provider: PolicyProvider<PolicyInput>,
+): PolicyProvider<PolicyInput> {
+  if (!provider.id) {
+    throw new Error(`Adapter ${adapterId} Policy provider id must not be empty`);
+  }
+  return Object.freeze({
+    id: `${adapterId}:${provider.id}`,
+    order: provider.order,
+    evaluate(input: PolicyInput) {
+      if (input.adapterId !== adapterId) return undefined;
+      return provider.evaluate(input);
+    },
   });
 }
 
