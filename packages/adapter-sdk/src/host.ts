@@ -1,7 +1,7 @@
 import type { ApprovalProvider } from "@axrail/approval";
 import { ArtifactProviderRegistry } from "@axrail/artifacts";
 import { PolicyEngine } from "@axrail/policy";
-import { ToolRegistry } from "@axrail/tools";
+import { ToolRegistry, type ToolDefinition } from "@axrail/tools";
 import { ValidationPipeline } from "@axrail/validation";
 import { AdapterContextRegistry } from "./context-registry.js";
 import { AdapterRegistry } from "./registry.js";
@@ -80,8 +80,9 @@ export class AdapterHost {
 
       const toolNames: string[] = [];
       for (const tool of adapter.tools?.() ?? []) {
-        disposers.push(this.tools.register(tool));
-        toolNames.push(tool.name);
+        const bound = bindAdapterTool(adapter.id, tool);
+        disposers.push(this.tools.register(bound));
+        toolNames.push(bound.name);
       }
 
       let artifactProviderId: string | undefined;
@@ -191,6 +192,21 @@ export class AdapterHost {
   list(): readonly MountedAdapter[] {
     return [...this.mounted.values()].map(snapshot);
   }
+}
+
+function bindAdapterTool(
+  adapterId: string,
+  tool: ToolDefinition<unknown, unknown>,
+): ToolDefinition<unknown, unknown> {
+  if (tool.providerId && tool.providerId !== adapterId) {
+    throw new Error(
+      `Adapter ${adapterId} cannot register Tool ${tool.name} for provider ${tool.providerId}`,
+    );
+  }
+  return Object.freeze({
+    ...tool,
+    providerId: adapterId,
+  });
 }
 
 function disposeReverse(disposers: Array<() => void>): void {
