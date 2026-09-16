@@ -115,7 +115,7 @@ export class TransactionHandle {
   async prepare(): Promise<void> {
     this.expect("created");
     await this.transition("preparing");
-    this.throwIfCancelled();
+    await this.throwIfCancelled();
 
     try {
       for (const artifact of this.record.changeSet.artifacts) {
@@ -136,14 +136,16 @@ export class TransactionHandle {
       await this.options.executor.prepare?.(this.snapshot());
       await this.transition("prepared");
     } catch (error) {
-      await this.fail("artifact_unavailable", transactionMessage(error), error);
+      if (this.record.state !== "cancelled") {
+        await this.fail("artifact_unavailable", transactionMessage(error), error);
+      }
       throw error;
     }
   }
 
   async evaluatePolicy(): Promise<void> {
     this.expect("prepared");
-    this.throwIfCancelled();
+    await this.throwIfCancelled();
 
     const risk = highestDeclaredRisk(this.record.changeSet);
     const highRiskApprovalRequired = risk === "L4" || risk === "L5";
@@ -187,7 +189,7 @@ export class TransactionHandle {
 
   async validate(): Promise<void> {
     this.expect("policy_checked");
-    this.throwIfCancelled();
+    await this.throwIfCancelled();
 
     if (!this.options.validate) {
       const result: ValidationResult = { valid: true, issues: [], validatorsRun: [] };
@@ -207,6 +209,7 @@ export class TransactionHandle {
 
   async requestApproval(): Promise<void> {
     this.expect("validated");
+    await this.throwIfCancelled();
     if (!this.approvalRequired) {
       await this.transition("approved", { implicit: true });
       return;
@@ -238,7 +241,7 @@ export class TransactionHandle {
       await this.transition("approved", { implicit: true });
     }
     this.expect("approved");
-    this.throwIfCancelled();
+    await this.throwIfCancelled();
 
     if (this.approvalRequired) await this.verifyApprovedEvidence();
 
@@ -260,6 +263,7 @@ export class TransactionHandle {
 
   async verify(): Promise<void> {
     this.expect("applying");
+    await this.throwIfCancelled();
     await this.transition("verifying");
     if (!this.options.executor.verify) return;
     try {
@@ -276,7 +280,7 @@ export class TransactionHandle {
 
   async commit(): Promise<void> {
     this.expect("verifying");
-    this.throwIfCancelled();
+    await this.throwIfCancelled();
 
     if (this.approvalRequired) await this.verifyApprovedEvidence();
 
@@ -359,12 +363,16 @@ export class TransactionHandle {
     }
   }
 
-  private throwIfCancelled(): void {
-    if (this.record.context.signal?.aborted) {
-      this.record.state = "cancelled";
-      this.record.updatedAt = this.now();
-      throw new TransactionError("cancelled", "Transaction was cancelled");
+  private async throwIfCancelled(): Promise<void> {
+    if (!this.record.context.signal?.aborted) return;
+    if (this.record.state !== "cancelled") {
+      this.record.error = {
+        code: "cancelled",
+        message: "Transaction was cancelled",
+      };
+      await this.transition("cancelled", this.record.error);
     }
+    throw new TransactionError("cancelled", "Transaction was cancelled");
   }
 
   private expect(...states: TransactionState[]): void {
