@@ -47,38 +47,48 @@ The current v0.1 foundation includes:
 
 APIs are still draft and may change before v1.0.
 
-## Axrail Agent runtime workspace
+## Development workspace: Kucell/axrail-agent
 
-The separate [`Kucell/axrail-agent`](https://github.com/Kucell/axrail-agent) project is the durable **agent task-management and execution-journal layer** for Axrail.
+The separate private repository `Kucell/axrail-agent` is **development tooling used to build this Axrail repository**.
 
-It is intentionally different from the `@axrail/agent` package in this repository:
+It is not part of the Axrail product runtime and must not be confused with the `@axrail/agent` package or other Agent-management capabilities implemented inside Axrail.
 
 ```text
-@axrail/agent
-  = in-process AgentLoop + model/tool orchestration
-
 Kucell/axrail-agent
-  = durable task state + plans + activities + decisions
-    + handoffs + waitpoints + memory + execution references
+  = development-time Agent task management
+  = development plans / activities / decisions / handoffs / memory
+  = records how Axrail itself is being developed
+
+@axrail/agent
+  = Axrail product runtime package
+  = in-process model/tool AgentLoop
+
+@axrail/harness
+  = Axrail product runtime composition root
+  = tools / policy / approval / events / transactions / adapters / agents
 ```
 
-The responsibility split is:
+The dependency direction is intentionally one-way:
 
 ```text
-AI / Agent
-    ↓
-axrail-agent
-Task / Plan / Activity / Decision / Handoff
-    ↓
-Axrail Harness
-Tool / Policy / Approval / Transaction / EventStore
-    ↓
-Industrial & Engineering Systems
+Development Agent
+      ↓
+Kucell/axrail-agent
+      ↓
+works on source code in
+Kucell/axrail
+      ↓
+builds Axrail product/runtime
 ```
 
-Axrail EventStore remains authoritative for governed execution facts such as tool calls, policy decisions, approvals, transactions, commits, and rollbacks. `axrail-agent` records the durable work context around those facts and correlates them through stable IDs such as `session_id`, `task_id`, `correlation_id`, `transaction_id`, and `changeset_id`.
+Axrail packages must not import or depend on `Kucell/axrail-agent` at runtime.
 
-The two systems should **reference and correlate rather than duplicate** the full raw event stream.
+The two repositories also record different classes of logs:
+
+- `Kucell/axrail-agent` records **development activity** such as implementation tasks, plans, CI results, code-review evidence, architecture decisions, and development handoffs.
+- Axrail `@axrail/events` records **product runtime execution** such as Agent sessions, Tool execution, Policy decisions, Approval, Transaction state, Commit, and Rollback.
+
+A CI run produced while developing `@axrail/transactions` can be referenced by `axrail-agent`; a customer's runtime `transaction.committed` event belongs to the Axrail application's EventStore, not the development repository.
 
 ## HMI reference flow
 
@@ -167,7 +177,7 @@ pnpm test
 
 ## Current priorities
 
-The next phase focuses on durable EventStore providers, approval freshness hardening, stronger adapter kits, and formalizing the integration boundary with `axrail-agent`.
+The next phase focuses on durable EventStore providers, approval freshness hardening, stronger adapter kits, and refining the product-runtime Agent management boundaries inside Axrail.
 
 ## License
 
