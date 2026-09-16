@@ -1,5 +1,6 @@
 import {
   digestChangeSet,
+  highestDeclaredRisk,
   snapshotChangeSet,
   type ChangeSet,
 } from "@axrail/changesets";
@@ -10,6 +11,7 @@ import type {
   TransactionContext,
   TransactionEvent,
   TransactionFailureCode,
+  TransactionPolicyObligation,
   TransactionRecord,
   TransactionRuntimeOptions,
   TransactionState,
@@ -143,12 +145,18 @@ export class TransactionHandle {
     this.expect("prepared");
     this.throwIfCancelled();
 
+    const risk = highestDeclaredRisk(this.record.changeSet);
+    const highRiskApprovalRequired = risk === "L4" || risk === "L5";
+
     if (!this.options.policy) {
-      if (!this.options.allowWithoutPolicy) {
-        await this.reject("policy_unavailable", "No transaction policy evaluator is configured");
-        throw new TransactionError("policy_unavailable", "No transaction policy evaluator is configured");
+      if (!this.options.allowWithoutPolicy || highRiskApprovalRequired) {
+        const message = highRiskApprovalRequired
+          ? `A transaction policy evaluator is required for ${risk} operations`
+          : "No transaction policy evaluator is configured";
+        await this.reject("policy_unavailable", message);
+        throw new TransactionError("policy_unavailable", message);
       }
-      await this.transition("policy_checked");
+      await this.transition("policy_checked", { risk, approvalRequired: false });
       return;
     }
 
@@ -158,8 +166,23 @@ export class TransactionHandle {
       await this.reject("policy_denied", message);
       throw new TransactionError("policy_denied", message);
     }
-    this.approvalRequired = decision.effect === "require_approval";
-    await this.transition("policy_checked", decision);
+
+    const obligationError = enforceTransactionObligations(
+      this.record.context,
+      decision.obligations,
+    );
+    if (obligationError) {
+      await this.reject("policy_obligation_unsatisfied", obligationError);
+      throw new TransactionError("policy_obligation_unsatisfied", obligationError);
+    }
+
+    this.approvalRequired = decision.effect === "require_approval" || highRiskApprovalRequired;
+    await this.transition("policy_checked", {
+      ...decision,
+      risk,
+      approvalRequired: this.approvalRequired,
+      highRiskFloor: highRiskApprovalRequired,
+    });
   }
 
   async validate(): Promise<void> {
@@ -360,6 +383,29 @@ export class TransactionHandle {
     };
     await this.options.onEvent?.(event, this.snapshot());
   }
+}
+
+function enforceTransactionObligations(
+  context: TransactionContext,
+  obligations: readonly TransactionPolicyObligation[] | undefined,
+): string | undefined {
+  for (const obligation of obligations ?? []) {
+    switch (obligation.type) {
+      case "require-transaction":
+        // This evaluator is already executing inside a TransactionRuntime.
+        break;
+      case "require-environment": {
+        const expected = obligation.parameters?.environment ?? obligation.parameters?.value;
+        if (typeof expected !== "string" || context.environment !== expected) {
+          return `Policy obligation require-environment is not satisfied (expected ${String(expected)})`;
+        }
+        break;
+      }
+      default:
+        return `Unsupported policy obligation: ${obligation.type}`;
+    }
+  }
+  return undefined;
 }
 
 function defaultId(): string {
