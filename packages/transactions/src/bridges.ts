@@ -1,5 +1,5 @@
 import { ApprovalService, isApprovalGranted, type ApprovalRequirement } from "@axrail/approval";
-import { highestDeclaredRisk, type ChangeSet } from "@axrail/changesets";
+import { digestChangeSet, highestDeclaredRisk, type ChangeSet } from "@axrail/changesets";
 import { PolicyEngine, type PolicyInput } from "@axrail/policy";
 import { ValidationPipeline } from "@axrail/validation";
 import type {
@@ -42,6 +42,7 @@ export function createTransactionApprovalProvider(
         if (value !== undefined) artifactVersions[key] = value;
       }
 
+      const changeSetDigest = await digestChangeSet(transaction.changeSet);
       const request = {
         id: options.requestId?.(transaction) ?? `approval:${transaction.id}`,
         transactionId: transaction.id,
@@ -62,6 +63,7 @@ export function createTransactionApprovalProvider(
         requiredApprovers: options.requiredApprovers,
         evidence: {
           changeSetId: transaction.changeSet.id,
+          changeSetDigest,
           artifactVersions,
           validationSummary: transaction.validation
             ? {
@@ -70,7 +72,13 @@ export function createTransactionApprovalProvider(
                 issueCount: transaction.validation.issues.length,
               }
             : undefined,
+          metadata: {
+            environment: transaction.context.environment,
+            adapterIds: transaction.context.adapterIds,
+            transactionMode: transaction.mode,
+          },
         },
+        evidenceDigest: changeSetDigest,
       } as const;
 
       const decision = await service.request(request);
