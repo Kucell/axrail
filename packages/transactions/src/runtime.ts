@@ -247,6 +247,7 @@ export class TransactionHandle {
     // during apply(), so the baseline version is no longer a valid commit-time
     // comparison for those modes.
     await this.checkConcurrency();
+    await this.runAuditCheckpoint("beforeApply", this.options.beforeApply);
     await this.transition("applying");
 
     try {
@@ -282,6 +283,7 @@ export class TransactionHandle {
     // Atomic executors are expected to stage without changing the externally
     // visible artifact version, so a final baseline check remains meaningful.
     if (this.record.mode === "atomic") await this.checkConcurrency();
+    await this.runAuditCheckpoint("beforeCommit", this.options.beforeCommit);
 
     try {
       await this.options.executor.commit?.(this.snapshot(), this.applyResult ?? {});
@@ -311,6 +313,20 @@ export class TransactionHandle {
   async cancel(): Promise<void> {
     if (TERMINAL_STATES.has(this.record.state)) return;
     await this.transition("cancelled");
+  }
+
+  private async runAuditCheckpoint(
+    label: string,
+    checkpoint: ((transaction: TransactionRecord) => Promise<void> | void) | undefined,
+  ): Promise<void> {
+    if (!checkpoint) return;
+    try {
+      await checkpoint(this.snapshot());
+    } catch (error) {
+      const message = `Required ${label} audit checkpoint failed: ${transactionMessage(error)}`;
+      await this.fail("audit_unavailable", message, error);
+      throw new TransactionError("audit_unavailable", message, error);
+    }
   }
 
   private async verifyApprovedEvidence(): Promise<void> {
