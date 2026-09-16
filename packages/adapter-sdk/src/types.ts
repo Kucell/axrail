@@ -43,6 +43,11 @@ export interface AdapterContextProvider {
   build(request: AdapterContextRequest): Promise<AdapterContextFragment>;
 }
 
+/**
+ * Experimental v0.1 surface. Harness does not yet orchestrate multi-adapter
+ * transaction participants; adapters should prefer governed Tool/Transaction
+ * executors until participant selection and composition semantics are frozen.
+ */
 export interface AdapterTransactionParticipant {
   readonly mode: TransactionMode;
   prepare?(transactionId: string): Promise<void>;
@@ -63,10 +68,20 @@ export interface AxrailAdapter {
 
   tools?(): readonly ToolDefinition<unknown, unknown>[];
   artifacts?(): ArtifactProvider;
+  /**
+   * Context providers are available through explicit Harness context retrieval.
+   * Axrail does not automatically inject returned content into model prompts.
+   */
   context?(): readonly AdapterContextProvider[];
   validators?(): readonly Validator<unknown>[];
   policies?(): readonly PolicyProvider[];
+  /**
+   * Experimental v0.1 surface. Adapter-provided approval providers are mounted
+   * for discovery but are not automatically selected by Harness governance.
+   * Applications should configure the Harness ApprovalService explicitly.
+   */
   approvals?(): readonly ApprovalProvider[];
+  /** Experimental v0.1 surface; see AdapterTransactionParticipant. */
   transactions?(): AdapterTransactionParticipant;
 
   initialize?(context: AdapterLifecycleContext): Promise<void> | void;
