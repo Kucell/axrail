@@ -1,4 +1,8 @@
-import type { ChangeSet } from "@axrail/changesets";
+import {
+  digestChangeSet,
+  snapshotChangeSet,
+  type ChangeSet,
+} from "@axrail/changesets";
 import type { ValidationResult } from "@axrail/validation";
 import { TransactionError, transactionMessage } from "./error.js";
 import type {
@@ -33,7 +37,7 @@ export class TransactionRuntime {
     const now = this.now();
     const record: MutableTransactionRecord = {
       id: this.options.idFactory?.() ?? defaultId(),
-      changeSet,
+      changeSet: snapshotChangeSet(changeSet),
       state: "created",
       mode: this.options.executor.mode,
       createdAt: now,
@@ -76,6 +80,7 @@ interface MutableTransactionRecord {
   updatedAt: string;
   context: TransactionContext;
   baselineVersions: Record<string, string | undefined>;
+  approvedEvidenceDigest?: string;
   validation?: ValidationResult;
   error?: TransactionRecord["error"];
 }
@@ -188,12 +193,21 @@ export class TransactionHandle {
       await this.fail("approval_unavailable", "Approval is required but no provider is configured");
       throw new TransactionError("approval_unavailable", "Approval is required but no provider is configured");
     }
-    const approved = await this.options.approval.approve(this.snapshot());
-    if (!approved) {
+
+    const approval = await this.options.approval.approve(this.snapshot());
+    if (!approval.approved) {
       await this.reject("approval_denied", "Transaction approval was denied");
       throw new TransactionError("approval_denied", "Transaction approval was denied");
     }
-    await this.transition("approved");
+    if (!approval.evidenceDigest) {
+      const message = "Approved transaction is missing an evidence digest";
+      await this.fail("approval_evidence_missing", message);
+      throw new TransactionError("approval_evidence_missing", message);
+    }
+
+    this.record.approvedEvidenceDigest = approval.evidenceDigest;
+    await this.verifyApprovedEvidence();
+    await this.transition("approved", { evidenceDigest: approval.evidenceDigest });
   }
 
   async apply(): Promise<void> {
@@ -202,6 +216,8 @@ export class TransactionHandle {
     }
     this.expect("approved");
     this.throwIfCancelled();
+
+    if (this.approvalRequired) await this.verifyApprovedEvidence();
 
     // The last safe optimistic-concurrency check for all transaction modes.
     // Compensating/best-effort adapters may mutate the authoritative artifact
@@ -238,6 +254,8 @@ export class TransactionHandle {
     this.expect("verifying");
     this.throwIfCancelled();
 
+    if (this.approvalRequired) await this.verifyApprovedEvidence();
+
     // Atomic executors are expected to stage without changing the externally
     // visible artifact version, so a final baseline check remains meaningful.
     if (this.record.mode === "atomic") await this.checkConcurrency();
@@ -270,6 +288,21 @@ export class TransactionHandle {
   async cancel(): Promise<void> {
     if (TERMINAL_STATES.has(this.record.state)) return;
     await this.transition("cancelled");
+  }
+
+  private async verifyApprovedEvidence(): Promise<void> {
+    const approved = this.record.approvedEvidenceDigest;
+    if (!approved) {
+      const message = "Transaction approval evidence is unavailable";
+      await this.fail("approval_evidence_missing", message);
+      throw new TransactionError("approval_evidence_missing", message);
+    }
+    const current = await digestChangeSet(this.record.changeSet);
+    if (current !== approved) {
+      const message = `Transaction approval evidence mismatch: approved ${approved}, current ${current}`;
+      await this.fail("approval_evidence_mismatch", message);
+      throw new TransactionError("approval_evidence_mismatch", message);
+    }
   }
 
   private async checkConcurrency(): Promise<void> {
