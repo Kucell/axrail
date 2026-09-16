@@ -67,18 +67,20 @@ export class ToolRuntime {
       return failure("cancelled", "Tool execution was cancelled before start");
     }
 
-    if (this.policy) {
-      const decision = await this.policy.evaluate(tool, call, context);
-      if (!decision.allow) {
-        return failure("policy_denied", decision.reason ?? "Tool execution denied by policy");
+    const decision = this.policy
+      ? await this.policy.evaluate(tool, call, context)
+      : defaultPolicy(tool);
+
+    if (!decision.allow) {
+      return failure("policy_denied", decision.reason ?? "Tool execution denied by policy");
+    }
+
+    if (decision.requireApproval) {
+      if (!this.approval) {
+        return failure("approval_unavailable", "Approval is required but no approval provider is configured");
       }
-      if (decision.requireApproval) {
-        if (!this.approval) {
-          return failure("approval_unavailable", "Approval is required but no approval provider is configured");
-        }
-        const approved = await this.approval.approve(tool, call, context);
-        if (!approved) return failure("approval_denied", "Tool execution was not approved");
-      }
+      const approved = await this.approval.approve(tool, call, context);
+      if (!approved) return failure("approval_denied", "Tool execution was not approved");
     }
 
     try {
@@ -92,6 +94,14 @@ export class ToolRuntime {
       return failure("execution_failed", messageOf(error));
     }
   }
+}
+
+function defaultPolicy(tool: ToolDefinition<unknown, unknown>): ToolPolicyDecision {
+  if (tool.risk === "L0" || tool.risk === "L1") return { allow: true };
+  return {
+    allow: false,
+    reason: `No policy provider configured for privileged tool ${tool.name} (${tool.risk})`,
+  };
 }
 
 function failure(code: string, message: string): ToolResult {
