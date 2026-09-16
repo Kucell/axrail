@@ -36,6 +36,7 @@ export interface ToolRuntimeEvent {
   readonly toolName: string;
   readonly sessionId?: string;
   readonly transactionId?: string;
+  readonly correlationId?: string;
   readonly actorId?: string;
   readonly data?: unknown;
 }
@@ -190,6 +191,7 @@ export class ToolRuntime {
         toolName: call.name,
         sessionId: context.sessionId,
         transactionId: context.transactionId,
+        correlationId: metadataString(context.metadata, "correlationId"),
         actorId: context.actorId,
         data,
       });
@@ -198,6 +200,14 @@ export class ToolRuntime {
       // can impose fail-closed persistence at the Harness/commit boundary.
     }
   }
+}
+
+function metadataString(
+  metadata: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): string | undefined {
+  const value = metadata?.[key];
+  return typeof value === "string" && value ? value : undefined;
 }
 
 function failure(code: string, message: string): ToolResult {
