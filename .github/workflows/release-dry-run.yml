@@ -1,0 +1,48 @@
+name: Release Candidate Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Expected lockstep package version
+        required: true
+        default: 0.1.0-rc.1
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify requested version
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          const root = JSON.parse(await readFile('package.json', 'utf8'));
+          if (root.version !== process.env.EXPECTED_VERSION) {
+            throw new Error(`Requested ${process.env.EXPECTED_VERSION}, repository is ${root.version}`);
+          }
+          EOF
+      - run: pnpm check
+      - run: pnpm test
+      - name: Pack and verify installable artifacts
+        env:
+          AXRAIL_ARTIFACT_DIR: artifacts/rc-packages
+        run: pnpm pack:smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axrail-${{ inputs.version }}-packages
+          path: artifacts/rc-packages/*.tgz
+          if-no-files-found: error
+          retention-days: 14
