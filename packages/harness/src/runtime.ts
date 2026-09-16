@@ -8,11 +8,13 @@ import {
 import {
   ApprovalService,
   type ApprovalPrincipal,
+  type ApprovalRequirement,
   isApprovalGranted,
 } from "@axrail/approval";
 import {
   InMemoryEventStore,
   SessionService,
+  type EventPrincipalRef,
   type EventStore,
 } from "@axrail/events";
 import type { PolicyInput } from "@axrail/policy";
@@ -23,7 +25,17 @@ import {
   type ToolExecutionContext,
   type ToolPolicyDecision,
   type ToolPolicyEvaluator,
+  type ToolRuntimeEvent,
 } from "@axrail/tools";
+import {
+  TransactionRuntime,
+  createTransactionApprovalProvider,
+  createTransactionPolicyEvaluator,
+  type TransactionEvent,
+  type TransactionExecutor,
+  type TransactionRecord,
+  type TransactionRuntimeOptions,
+} from "@axrail/transactions";
 import { HarnessAgent, type HarnessAgentOptions } from "./agent.js";
 
 export interface HarnessRuntimeOptions {
@@ -34,6 +46,13 @@ export interface HarnessRuntimeOptions {
   readonly environment?: string;
   readonly now?: () => string;
   readonly idFactory?: (prefix: string) => string;
+}
+
+export interface HarnessTransactionRuntimeOptions {
+  readonly executor: TransactionExecutor;
+  readonly allowWithoutPolicy?: boolean;
+  readonly requiredApprovers?: readonly ApprovalRequirement[];
+  readonly onEvent?: TransactionRuntimeOptions["onEvent"];
 }
 
 export class HarnessRuntime {
@@ -65,11 +84,57 @@ export class HarnessRuntime {
       registry: this.adapters.tools,
       policy: new HarnessToolPolicy(this),
       approval: this.approval ? new HarnessToolApproval(this) : undefined,
+      now: this.now,
+      onEvent: (event) => this.recordToolEvent(event),
     });
   }
 
   createAgent(options: HarnessAgentOptions): HarnessAgent {
     return new HarnessAgent(this, options);
+  }
+
+  createTransactionRuntime(
+    options: HarnessTransactionRuntimeOptions,
+  ): TransactionRuntime {
+    const policy = this.adapters.policy.list().length > 0
+      ? createTransactionPolicyEvaluator(this.adapters.policy)
+      : undefined;
+
+    const approval = this.approval
+      ? createTransactionApprovalProvider(this.approval, {
+          requiredApprovers: options.requiredApprovers,
+          requestId: () => this.nextId("approval"),
+        })
+      : undefined;
+
+    return new TransactionRuntime({
+      executor: options.executor,
+      artifacts: this.adapters.artifacts,
+      policy,
+      approval,
+      allowWithoutPolicy: options.allowWithoutPolicy,
+      idFactory: () => this.nextId("tx"),
+      now: this.now,
+      validate: (changeSet, transaction) =>
+        this.adapters.validation.validate(changeSet, {
+          environment: transaction.context.environment ?? this.environment,
+          signal: transaction.context.signal,
+          metadata: {
+            transactionId: transaction.id,
+            mode: transaction.mode,
+            sessionId: transaction.context.sessionId,
+            correlationId: transaction.context.correlationId,
+          },
+        }),
+      onEvent: async (event, transaction) => {
+        await this.recordTransactionEvent(event, transaction);
+        try {
+          await options.onEvent?.(event, transaction);
+        } catch {
+          // Observer instrumentation is non-authoritative in v0.1.
+        }
+      },
+    });
   }
 
   mountAdapter(
@@ -122,6 +187,60 @@ export class HarnessRuntime {
 
   currentTime(): string {
     return this.now();
+  }
+
+  private async recordToolEvent(event: ToolRuntimeEvent): Promise<void> {
+    try {
+      await this.events.append({
+        id: this.nextId("evt"),
+        type: normalizedToolEventType(event),
+        version: "1",
+        time: event.time,
+        sessionId: event.sessionId,
+        transactionId: event.transactionId,
+        toolCallId: event.callId,
+        actor: principalFromActorId(event.actorId),
+        source: "tool-runtime",
+        correlationId: event.correlationId,
+        data: {
+          toolName: event.toolName,
+          detail: event.data,
+        },
+      });
+    } catch {
+      // Event instrumentation remains observational until durable-audit mode is
+      // explicitly enabled by a future Harness profile.
+    }
+  }
+
+  private async recordTransactionEvent(
+    event: TransactionEvent,
+    transaction: TransactionRecord,
+  ): Promise<void> {
+    try {
+      await this.events.append({
+        id: this.nextId("evt"),
+        type: event.type,
+        version: "1",
+        time: event.time,
+        sessionId: event.sessionId,
+        transactionId: event.transactionId,
+        changeSetId: event.changeSetId ?? transaction.changeSet.id,
+        artifactRefs:
+          event.artifactRefs ?? transaction.changeSet.artifacts.map((artifact) => artifact.id),
+        actor: principalFromTransaction(transaction),
+        source: "transaction-runtime",
+        correlationId: event.correlationId,
+        data: {
+          state: event.state,
+          mode: transaction.mode,
+          detail: event.data,
+        },
+      });
+    } catch {
+      // See recordToolEvent. Durable fail-closed auditing belongs to an explicit
+      // deployment profile rather than changing transaction semantics silently.
+    }
   }
 }
 
@@ -195,6 +314,38 @@ class HarnessToolApproval implements ToolApprovalProvider {
     const decision = await this.harness.approval.request(request);
     return isApprovalGranted(request, decision, this.harness.currentTime());
   }
+}
+
+function normalizedToolEventType(event: ToolRuntimeEvent): string {
+  if (event.type === "tool.policy.evaluated") return "policy.evaluation.completed";
+  if (event.type === "tool.approval.requested") return "approval.requested";
+  if (event.type === "tool.approval.completed") {
+    return eventApproved(event.data) ? "approval.approved" : "approval.rejected";
+  }
+  return event.type;
+}
+
+function eventApproved(data: unknown): boolean {
+  return Boolean(
+    data &&
+      typeof data === "object" &&
+      (data as { approved?: unknown }).approved === true,
+  );
+}
+
+function principalFromActorId(actorId: string | undefined): EventPrincipalRef | undefined {
+  return actorId ? { id: actorId, type: "human" } : undefined;
+}
+
+function principalFromTransaction(transaction: TransactionRecord): EventPrincipalRef | undefined {
+  const actor = transaction.context.actor;
+  return actor
+    ? {
+        id: actor.id,
+        type: actor.type,
+        displayName: actor.displayName,
+      }
+    : undefined;
 }
 
 function metadataString(
