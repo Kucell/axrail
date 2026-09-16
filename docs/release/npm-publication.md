@@ -36,7 +36,7 @@ Trusted Publishing cannot be configured for a package that does not yet exist in
 
 ## Required GitHub Environments
 
-Create these environments under repository **Settings → Environments**:
+Create these environments under repository **Settings → Environments**. After the protection rules are configured, add an Environment variable named `RELEASE_GUARD` with the exact value `enabled` to each environment. Every side-effecting release job checks this variable before it can continue. This prevents an accidentally auto-created, unprotected Environment from being treated as configured.
 
 ### `npm-release-bootstrap`
 
@@ -47,6 +47,7 @@ Recommended protection:
 - required reviewer(s);
 - prevent self-review when the maintainer model supports it;
 - only the default branch or explicitly allowed release refs;
+- environment variable `RELEASE_GUARD=enabled`;
 - environment secret `NPM_TOKEN` containing only the temporary bootstrap token.
 
 ### `npm-release`
@@ -57,6 +58,7 @@ Recommended protection:
 
 - required reviewer(s);
 - prevent self-review where practical;
+- environment variable `RELEASE_GUARD=enabled`;
 - no long-lived npm token;
 - OIDC only (`id-token: write`).
 
@@ -68,6 +70,7 @@ Recommended protection:
 
 - required reviewer(s);
 - restrict to approved release refs/branches;
+- environment variable `RELEASE_GUARD=enabled`;
 - no npm credentials.
 
 ## First release: bootstrap
@@ -87,9 +90,10 @@ The workflow:
 2. runs frozen install, check, build/tests and `pack:smoke`;
 3. retains the exact verified tarballs as an Actions artifact;
 4. waits on the `npm-release-bootstrap` Environment;
-5. downloads those exact tarballs;
-6. authenticates with the temporary environment `NPM_TOKEN`;
-7. publishes all 15 packages in dependency order with `--access public --tag rc --provenance`.
+5. requires `RELEASE_GUARD=enabled`;
+6. downloads those exact tarballs;
+7. authenticates with the temporary environment `NPM_TOKEN`;
+8. publishes all 15 packages in dependency order with `--access public --tag rc --provenance`.
 
 After a successful bootstrap:
 
@@ -125,7 +129,7 @@ RC:    version=0.1.0-rc.2  dist_tag=rc
 Final: version=0.1.0       dist_tag=latest
 ```
 
-The workflow runs the complete verification gate, uploads the verified tarballs, then waits on the `npm-release` Environment. The staging job uses GitHub OIDC and does not require a long-lived npm token.
+The workflow runs the complete verification gate, uploads the verified tarballs, then waits on the `npm-release` Environment. The staging job requires `RELEASE_GUARD=enabled`, uses GitHub OIDC, and does not require a long-lived npm token.
 
 Each package is submitted with `npm stage publish`. A staged package is not public. A maintainer must review and approve the staged package on npmjs.com (or through npm CLI) with 2FA before it becomes public.
 
@@ -143,13 +147,15 @@ confirm = FINALIZE-RELEASE
 
 The workflow:
 
-1. checks out the exact commit;
-2. verifies its root version;
-3. verifies the commit is part of `main`;
-4. verifies all 15 `@axrail/*` packages are public at the requested version;
-5. verifies a release-notes file exists at `docs/release/notes/v<version>.md`;
-6. creates an annotated `v<version>` tag;
-7. creates the GitHub Release from that immutable tag.
+1. waits on the protected `github-release` Environment;
+2. requires `RELEASE_GUARD=enabled`;
+3. checks out the exact commit;
+4. verifies its root version;
+5. verifies the commit is part of `main`;
+6. verifies all 15 `@axrail/*` packages are public at the requested version;
+7. verifies a release-notes file exists at `docs/release/notes/v<version>.md`;
+8. creates an annotated `v<version>` tag;
+9. creates the GitHub Release from that immutable tag.
 
 RC versions are marked as GitHub prereleases.
 
@@ -164,7 +170,7 @@ If staged publishing fails, staged versions may be reviewed/rejected through npm
 ## Supply-chain requirements
 
 - Third-party GitHub Actions in release workflows are pinned to immutable commit SHAs.
-- Credentialed jobs use protected GitHub Environments.
+- Side-effecting release jobs require both a protected GitHub Environment and `RELEASE_GUARD=enabled`.
 - Trusted Publishing uses OIDC rather than long-lived npm tokens after bootstrap.
 - Public-package provenance is enabled from GitHub-hosted runners.
 - The GitHub Release is finalized only after npm registry visibility is independently verified.
