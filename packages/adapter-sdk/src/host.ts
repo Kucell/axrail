@@ -2,7 +2,7 @@ import type { ApprovalProvider } from "@axrail/approval";
 import { ArtifactProviderRegistry } from "@axrail/artifacts";
 import { PolicyEngine } from "@axrail/policy";
 import { ToolRegistry, type ToolDefinition } from "@axrail/tools";
-import { ValidationPipeline } from "@axrail/validation";
+import { ValidationPipeline, type Validator } from "@axrail/validation";
 import { AdapterContextRegistry } from "./context-registry.js";
 import { AdapterRegistry } from "./registry.js";
 import type {
@@ -97,11 +97,9 @@ export class AdapterHost {
 
       const validatorIds: string[] = [];
       for (const validator of adapter.validators?.() ?? []) {
-        this.validation.register(validator);
-        validatorIds.push(validator.id);
-        disposers.push(() => {
-          this.validation.unregister(validator.id);
-        });
+        const bound = bindAdapterValidator(adapter.id, validator);
+        disposers.push(this.validation.register(bound));
+        validatorIds.push(bound.id);
       }
 
       const policyProviderIds: string[] = [];
@@ -163,7 +161,11 @@ export class AdapterHost {
     const record = this.mounted.get(adapterId);
     if (!record) return;
 
-    // Stop new external behavior first, then remove local registrations.
+    // Drain local provider surfaces before beginning external shutdown. New
+    // Tool calls, validation, policy resolution, artifact access and context
+    // lookups can no longer route into this adapter once stop() begins.
+    disposeReverse(record.disposers);
+
     let stopError: unknown;
     try {
       await this.registry.stop(adapterId, context);
@@ -171,7 +173,6 @@ export class AdapterHost {
       stopError = error;
     }
 
-    disposeReverse(record.disposers);
     this.mounted.delete(adapterId);
 
     try {
@@ -205,6 +206,21 @@ function bindAdapterTool(
   }
   return Object.freeze({
     ...tool,
+    providerId: adapterId,
+  });
+}
+
+function bindAdapterValidator(
+  adapterId: string,
+  validator: Validator<unknown>,
+): Validator<unknown> {
+  if (validator.providerId && validator.providerId !== adapterId) {
+    throw new Error(
+      `Adapter ${adapterId} cannot register Validator ${validator.id} for provider ${validator.providerId}`,
+    );
+  }
+  return Object.freeze({
+    ...validator,
     providerId: adapterId,
   });
 }
