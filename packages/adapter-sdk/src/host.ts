@@ -6,6 +6,8 @@ import { ValidationPipeline, type Validator } from "@axrail/validation";
 import { AdapterContextRegistry } from "./context-registry.js";
 import { AdapterRegistry } from "./registry.js";
 import type {
+  AdapterContextFragment,
+  AdapterContextRequest,
   AdapterLifecycleContext,
   AdapterTransactionParticipant,
   AxrailAdapter,
@@ -22,6 +24,13 @@ export interface AdapterHostSurfaces {
 
 export interface AdapterHostOptions extends AdapterHostSurfaces {
   readonly registry?: AdapterRegistry;
+}
+
+export interface AdapterContextBuildOptions {
+  /** Explicit Adapter scope. Context is never implicitly aggregated globally. */
+  readonly adapterIds: readonly string[];
+  /** Sensitive fragments are excluded unless the caller explicitly opts in. */
+  readonly includeSensitive?: boolean;
 }
 
 export interface MountedAdapter {
@@ -152,6 +161,31 @@ export class AdapterHost {
       }
       throw error;
     }
+  }
+
+  /**
+   * Builds context only from explicitly selected mounted adapters. Sensitive
+   * fragments remain excluded unless requested by the application. Axrail does
+   * not automatically inject these fragments into model prompts.
+   */
+  async buildContext(
+    request: AdapterContextRequest,
+    options: AdapterContextBuildOptions,
+  ): Promise<readonly AdapterContextFragment[]> {
+    if (!options.adapterIds.length) {
+      throw new Error("Adapter context retrieval requires at least one adapterId");
+    }
+
+    const fragments: AdapterContextFragment[] = [];
+    for (const adapterId of new Set(options.adapterIds)) {
+      this.get(adapterId); // Fail if the requested Adapter is not mounted/available.
+      const built = await this.contexts.buildAll(request, adapterId);
+      for (const fragment of built) {
+        if (fragment.sensitive && !options.includeSensitive) continue;
+        fragments.push(fragment);
+      }
+    }
+    return fragments;
   }
 
   async unmount(
