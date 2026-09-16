@@ -97,6 +97,7 @@ export function createTransactionValidator(
   return (changeSet: ChangeSet, transaction: TransactionRecord) =>
     pipeline.validate(changeSet, {
       environment: transaction.context.environment,
+      providerIds: transaction.context.adapterIds,
       signal: transaction.context.signal,
       metadata: {
         transactionId: transaction.id,
