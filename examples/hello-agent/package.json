@@ -1,0 +1,1 @@
+{"name":"@axrail/example-hello-agent","version":"0.0.0","private":true,"type":"module","scripts":{"test":"node --input-type=module -e \"\""}}

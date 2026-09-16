@@ -1,0 +1,14 @@
+{
+  "name": "axrail",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Transactional AI execution for industrial and engineering software.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.6.5",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": { "typescript": "^5.7.3" }
+}
