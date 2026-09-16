@@ -8,7 +8,10 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "pnpm -r test"
+    "test": "tsx --test tests/*.test.ts"
   },
-  "devDependencies": { "typescript": "^5.7.3" }
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
 }
