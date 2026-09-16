@@ -9,6 +9,7 @@
     "@axrail/approval": "workspace:*",
     "@axrail/artifacts": "workspace:*",
     "@axrail/changesets": "workspace:*",
+    "@axrail/hmi-adapter-kit": "workspace:*",
     "@axrail/policy": "workspace:*",
     "@axrail/tools": "workspace:*",
     "@axrail/transactions": "workspace:*",
