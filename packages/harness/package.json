@@ -11,7 +11,8 @@
     "@axrail/approval": "workspace:*",
     "@axrail/events": "workspace:*",
     "@axrail/policy": "workspace:*",
-    "@axrail/tools": "workspace:*"
+    "@axrail/tools": "workspace:*",
+    "@axrail/transactions": "workspace:*"
   },
   "scripts": { "test": "node --input-type=module -e \"\"" }
 }
