@@ -1,0 +1,92 @@
+name: Finalize GitHub Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published lockstep version
+        required: true
+        default: 0.1.0-rc.1
+        type: string
+      commit_sha:
+        description: Exact verified commit SHA to tag
+        required: true
+        type: string
+      confirm:
+        description: Type FINALIZE-RELEASE to continue
+        required: true
+        type: string
+
+concurrency:
+  group: axrail-github-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    environment: github-release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify confirmation, commit and version
+        env:
+          VERSION: ${{ inputs.version }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM" = "FINALIZE-RELEASE"
+          test "$(git rev-parse HEAD)" = "$COMMIT_SHA"
+          test "$(node -p "require('./package.json').version")" = "$VERSION"
+          git fetch origin main --depth=1
+          git merge-base --is-ancestor "$COMMIT_SHA" origin/main
+      - name: Verify all 15 npm packages are public at the requested version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          packages=(approval artifacts events policy tools validation changesets agent mcp model-openai-compatible cli transactions adapter-sdk hmi-adapter-kit harness)
+          for package in "${packages[@]}"; do
+            actual="$(npm view "@axrail/${package}@${VERSION}" version --json | tr -d '"')"
+            test "$actual" = "$VERSION"
+            echo "registry ok: @axrail/${package}@${VERSION}"
+          done
+      - name: Verify release notes and tag availability
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          test -f "docs/release/notes/v${VERSION}.md"
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "Tag v${VERSION} already exists" >&2
+            exit 1
+          fi
+      - name: Create immutable release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "Axrail ${VERSION}"
+          git push origin "v${VERSION}"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "v${VERSION}" \
+            --verify-tag \
+            --title "Axrail ${VERSION}" \
+            --notes-file "docs/release/notes/v${VERSION}.md" \
+            "${prerelease[@]}"
