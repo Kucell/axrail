@@ -24,17 +24,20 @@ Approval
 Commit
 ```
 
+## RFCs
+
+1. [RFC-0001 Artifact Model](../../rfcs/0001-artifact-model/README.md)
+2. [RFC-0002 ChangeSet Protocol](../../rfcs/0002-changeset-protocol/README.md)
+3. [RFC-0003 Transaction Runtime](../../rfcs/0003-transaction-runtime/README.md)
+4. [RFC-0004 Capability & Plugin Model](../../rfcs/0004-capability-plugin-model/README.md)
+5. [RFC-0005 Tool Runtime & Risk Model](../../rfcs/0005-tool-runtime-risk-model/README.md)
+
 ## Architecture workstream
 
-The first durable specifications should focus on:
+The next durable specifications should focus on:
 
-1. Artifact Model
-2. ChangeSet Protocol
-3. Transaction Runtime
-4. Capability and Plugin Model
-5. Tool Runtime and Risk Model
 6. Adapter Protocol
 7. Policy and Approval Model
 8. Event and Session Model
 
-See [`../../rfcs/`](../../rfcs/) for evolving protocol proposals.
+After those contracts stabilize, implementation can proceed in `@axrail/core`, `@axrail/tools`, `@axrail/transactions`, and `@axrail/adapter-sdk` with fewer architectural rewrites.
