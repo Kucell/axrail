@@ -82,7 +82,10 @@ export function createTransactionApprovalProvider(
       } as const;
 
       const decision = await service.request(request);
-      return isApprovalGranted(request, decision);
+      return {
+        approved: isApprovalGranted(request, decision),
+        evidenceDigest: decision.evidenceDigest,
+      };
     },
   };
 }
