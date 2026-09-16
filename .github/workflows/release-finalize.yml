@@ -29,6 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: github-release
     steps:
+      - name: Verify protected environment is intentionally configured
+        env:
+          RELEASE_GUARD: ${{ vars.RELEASE_GUARD }}
+        run: test "$RELEASE_GUARD" = "enabled"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.commit_sha }}
