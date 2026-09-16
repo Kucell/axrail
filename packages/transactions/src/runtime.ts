@@ -405,7 +405,14 @@ export class TransactionHandle {
       state,
       data,
     };
-    await this.options.onEvent?.(event, this.snapshot());
+    try {
+      await this.options.onEvent?.(event, this.snapshot());
+    } catch {
+      // Lifecycle observers are intentionally non-authoritative. They must not
+      // change transaction outcome truth after an engineering effect has
+      // occurred. Deployments that require fail-closed durable evidence use
+      // beforeApply / beforeCommit checkpoints instead.
+    }
   }
 }
 
