@@ -1,14 +1,21 @@
 import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const packageNames = ["approval","artifacts","events","policy","tools","validation","changesets","agent","mcp","model-openai-compatible","cli","transactions","adapter-sdk","hmi-adapter-kit","harness"];
 const work = await mkdtemp(join(tmpdir(), "axrail-pack-smoke-"));
-const tarballs = join(work, "tarballs");
+const retainedTarballDir = process.env.AXRAIL_ARTIFACT_DIR
+  ? resolve(root, process.env.AXRAIL_ARTIFACT_DIR)
+  : undefined;
+const tarballs = retainedTarballDir ?? join(work, "tarballs");
 const consumer = join(work, "consumer");
+
+if (retainedTarballDir) {
+  await rm(retainedTarballDir, { recursive: true, force: true });
+}
 await mkdir(tarballs, { recursive: true });
 await mkdir(consumer, { recursive: true });
 
@@ -50,10 +57,9 @@ try {
   execFileSync(cliBin, ["--version"], { cwd: consumer, stdio: "inherit" });
 
   console.log(`Axrail package smoke passed for ${packageNames.length} packages.`);
-} finally {
-  if (process.env.AXRAIL_KEEP_SMOKE !== "1") {
-    await rm(work, { recursive: true, force: true });
-  } else {
-    console.log(`Kept smoke workspace at ${work}`);
+  if (retainedTarballDir) {
+    console.log(`Retained package tarballs at ${retainedTarballDir}`);
   }
+} finally {
+  await rm(work, { recursive: true, force: true });
 }
