@@ -2,7 +2,6 @@ import { AgentLoop, type AgentModelProvider } from "@axrail/agent";
 import {
   AdapterRegistry,
   type AxrailAdapter,
-  type CapabilityManifest,
 } from "@axrail/adapter-sdk";
 import {
   ApprovalService,
@@ -15,11 +14,15 @@ import {
   type ArtifactRef,
 } from "@axrail/artifacts";
 import type { ChangeSet } from "@axrail/changesets";
-import { PolicyEngine } from "@axrail/policy";
 import {
-  ToolRuntime,
-  type ToolDefinition,
-} from "@axrail/tools";
+  HMI_CAPABILITIES,
+  createHmiCapabilityManifest,
+  createHmiTools,
+  exactHmiCapabilities,
+  hmiProjectRef,
+} from "@axrail/hmi-adapter-kit";
+import { PolicyEngine } from "@axrail/policy";
+import { ToolRuntime } from "@axrail/tools";
 import {
   TransactionRuntime,
   createTransactionApprovalProvider,
@@ -50,7 +53,7 @@ const artifactProvider: ArtifactProvider = {
       version: String(project.version),
       provider: "mock-hmi",
       metadata: { screenCount: project.screens.length },
-      capabilities: ["hmi.screen.create"],
+      capabilities: [HMI_CAPABILITIES.SCREEN_CREATE],
     };
   },
   async exists(ref): Promise<boolean> {
@@ -161,41 +164,33 @@ const transactions = new TransactionRuntime({
   validate: createTransactionValidator(validation),
 });
 
-const createScreenTool: ToolDefinition<unknown, unknown> = {
-  name: "hmi.screen.create",
-  description: "Create a screen in the mock HMI engineering project.",
-  risk: "L2",
-  effect: "engineering-write",
-  inputSchema: {
-    type: "object",
-    properties: { name: { type: "string", minLength: 1 } },
-    required: ["name"],
-    additionalProperties: false,
-  },
-  async execute(input, context) {
-    const name = parseScreenName(input);
+const hmiTools = createHmiTools({
+  async screenCreate(input, context) {
+    assertProjectId(input.projectId);
+
     const version = String(project.version);
     const changeSet: ChangeSet = {
-      id: `changeset:create-screen:${name}`,
+      id: `changeset:create-screen:${input.name}`,
       protocolVersion: "0.1",
       artifacts: [
-        {
-          id: project.id,
-          type: "industrial.hmi.project",
+        hmiProjectRef(project.id, {
           version,
           provider: "mock-hmi",
-        },
+        }),
       ],
       actor: context.actorId
         ? { id: context.actorId, type: "user" }
         : undefined,
-      reason: `Create HMI screen ${name}`,
+      reason: `Create HMI screen ${input.name}`,
       operations: [
         {
           id: "create-screen",
           op: "create",
           target: "screen",
-          value: { name },
+          value: {
+            name: input.name,
+            template: input.template,
+          },
           risk: { level: "L2", reasons: ["Modifies an engineering artifact"] },
         },
       ],
@@ -208,34 +203,38 @@ const createScreenTool: ToolDefinition<unknown, unknown> = {
     });
 
     if (result.state !== "committed") {
-      throw new Error(`HMI transaction did not commit: ${result.state} (${result.error?.message ?? "unknown error"})`);
+      throw new Error(
+        `HMI transaction did not commit: ${result.state} (${result.error?.message ?? "unknown error"})`,
+      );
     }
 
     return {
       projectId: project.id,
-      screen: name,
+      screen: input.name,
       projectVersion: project.version,
     };
   },
-};
+});
 
 const adapter: AxrailAdapter = {
   id: "mock-hmi",
   version: "0.1.0",
-  async capabilities(): Promise<CapabilityManifest> {
-    return {
+  async capabilities() {
+    return createHmiCapabilityManifest({
       adapterId: "mock-hmi",
       adapterVersion: "0.1.0",
       protocolVersion: "0.1",
       target: { vendor: "Axrail", product: "Mock HMI" },
-      capabilities: {
-        "hmi.project.artifact": { level: "exact" },
-        "hmi.screen.create": { level: "exact" },
+      support: exactHmiCapabilities(
+        HMI_CAPABILITIES.PROJECT_ARTIFACT,
+        HMI_CAPABILITIES.SCREEN_CREATE,
+      ),
+      extraCapabilities: {
         "transaction.atomic": { level: "exact" },
       },
-    };
+    });
   },
-  tools: () => [createScreenTool],
+  tools: () => hmiTools,
   artifacts: () => artifactProvider,
 };
 
@@ -250,7 +249,7 @@ const toolRuntime = new ToolRuntime({
   // validation, and approval before committing the artifact.
   policy: {
     evaluate(tool) {
-      return tool.name === "hmi.screen.create"
+      return tool.name === HMI_CAPABILITIES.SCREEN_CREATE
         ? { allow: true }
         : { allow: false, reason: "Tool is not allowed in this example" };
     },
@@ -273,8 +272,11 @@ const model: AgentModelProvider = {
       toolCalls: [
         {
           id: "call:create-robot-overview",
-          name: "hmi.screen.create",
-          input: { name: "Robot Overview" },
+          name: HMI_CAPABILITIES.SCREEN_CREATE,
+          input: {
+            projectId: project.id,
+            name: "Robot Overview",
+          },
         },
       ],
       stopReason: "tool_calls",
@@ -300,10 +302,10 @@ function assertProject(ref: ArtifactRef): void {
   if (ref.id !== project.id) throw new Error(`Unknown mock HMI artifact: ${ref.id}`);
 }
 
-function parseScreenName(input: unknown): string {
-  const name = readScreenName(input);
-  if (!name) throw new Error("Expected input { name: non-empty string }");
-  return name;
+function assertProjectId(projectId: string): void {
+  if (projectId !== project.id) {
+    throw new Error(`Unknown mock HMI project: ${projectId}`);
+  }
 }
 
 function readScreenName(value: unknown): string | undefined {
