@@ -1,1 +1,2 @@
-export type Approval = { readonly approved: boolean; readonly by?: string };
+export * from "./types.js";
+export * from "./service.js";
