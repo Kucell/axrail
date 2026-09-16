@@ -31,13 +31,23 @@ Commit
 3. [RFC-0003 Transaction Runtime](../../rfcs/0003-transaction-runtime/README.md)
 4. [RFC-0004 Capability & Plugin Model](../../rfcs/0004-capability-plugin-model/README.md)
 5. [RFC-0005 Tool Runtime & Risk Model](../../rfcs/0005-tool-runtime-risk-model/README.md)
+6. [RFC-0006 Adapter Protocol](../../rfcs/0006-adapter-protocol/README.md)
+7. [RFC-0007 Policy & Approval Model](../../rfcs/0007-policy-approval-model/README.md)
+8. [RFC-0008 Event & Session Model](../../rfcs/0008-event-session-model/README.md)
 
-## Architecture workstream
+## Implementation workstream
 
-The next durable specifications should focus on:
+The v0.1 protocol skeleton is now complete enough to start implementation with substantially less architectural churn.
 
-6. Adapter Protocol
-7. Policy and Approval Model
-8. Event and Session Model
+Recommended implementation order:
 
-After those contracts stabilize, implementation can proceed in `@axrail/core`, `@axrail/tools`, `@axrail/transactions`, and `@axrail/adapter-sdk` with fewer architectural rewrites.
+1. `@axrail/core` — capability registry, plugin lifecycle, scopes, events
+2. `@axrail/tools` — tool contracts, registry, risk metadata, controlled execution pipeline
+3. `@axrail/artifacts` and `@axrail/changesets` — portable engineering data contracts
+4. `@axrail/policy`, `@axrail/approval`, `@axrail/validation` — governance pipeline
+5. `@axrail/transactions` — transaction state machine, prepare/commit/rollback
+6. `@axrail/adapter-sdk` — external engineering-system boundary
+7. `@axrail/mcp` — bridge MCP tools into Axrail-native execution
+8. `@axrail/agent` — agent loop built on top of the governed runtime
+
+The implementation should continue to treat HMI as a reference domain rather than a kernel dependency.
