@@ -13,6 +13,7 @@ export interface HmiCapabilityManifestOptions {
   readonly protocolVersion?: string;
   readonly target?: CapabilityManifest["target"];
   readonly support?: Partial<Record<HmiCapabilityName, CapabilitySupport>>;
+  readonly extraCapabilities?: Readonly<Record<string, CapabilitySupport>>;
   readonly featureFlags?: readonly string[];
 }
 
@@ -29,6 +30,8 @@ export function createHmiCapabilityManifest(
       reason: "Capability was not declared by the adapter",
     };
   }
+
+  Object.assign(capabilities, options.extraCapabilities ?? {});
 
   return {
     adapterId: options.adapterId,
