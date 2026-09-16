@@ -6,8 +6,10 @@
   "types": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
+    "@axrail/approval": "workspace:*",
     "@axrail/artifacts": "workspace:*",
     "@axrail/changesets": "workspace:*",
+    "@axrail/policy": "workspace:*",
     "@axrail/validation": "workspace:*"
   },
   "scripts": { "test": "node --input-type=module -e \"\"" }
