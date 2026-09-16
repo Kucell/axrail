@@ -1,1 +1,4 @@
-export type McpCapability = { readonly name: string };
+export * from "./types.js";
+export * from "./naming.js";
+export * from "./risk.js";
+export * from "./bridge.js";
