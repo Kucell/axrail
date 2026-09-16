@@ -29,27 +29,59 @@ The goal is not `model → tool → execute`. Important engineering changes beco
 
 ## Runtime foundation
 
-The implemented v0.1 functional foundation includes:
+The implemented v0.1 foundation includes:
 
 - **`@axrail/harness`** — primary high-level composition root that binds adapters, tools, policy, approval, events, sessions, agents, transactions, provider-aware Tool routing, and explicit audit profiles into an embeddable Harness runtime.
 - **`@axrail/tools`** — governed Tool registry/execution, immutable Tool invocation evidence, provider-aware semantic Tool resolution, L0-L5 risk metadata, policy/approval hooks, and fail-closed privileged execution.
 - **`@axrail/artifacts`** — portable engineering artifact identity, versions, snapshots, providers.
 - **`@axrail/changesets`** — structured engineering changes, operations, preconditions, risk metadata, immutable snapshots, and canonical SHA-256 digests.
-- **`@axrail/validation`** — composable schema, semantic, domain, adapter, safety and post-execution validation stages.
+- **`@axrail/validation`** — composable schema, semantic, domain, adapter, safety and post-execution validation stages with provider-aware Adapter scoping.
 - **`@axrail/policy`** — deny-overrides policy composition with default-deny behavior and deterministic obligations.
 - **`@axrail/approval`** — approval requests, quorum/role requirements, expiration, evidence binding, and fail-closed provider behavior.
 - **`@axrail/transactions`** — transaction state machine, immutable ChangeSet evidence, optimistic concurrency, atomic/compensating/best-effort executors, validation/policy/approval bridges, audit checkpoints, and explicit rollback.
 - **`@axrail/events`** — observable runtime event envelopes, EventStore contracts, session lifecycle, correlation, replay, in-memory storage, and durable append-only JSONL storage.
-- **`@axrail/adapter-sdk`** — vendor-neutral Adapter lifecycle, atomic mounting, provider binding, context providers, and capability manifests (`exact`, `compatible`, `degraded`, `unsupported`).
+- **`@axrail/adapter-sdk`** — vendor-neutral Adapter lifecycle, atomic mounting, provider binding, explicit context retrieval, and capability manifests (`exact`, `compatible`, `degraded`, `unsupported`).
 - **`@axrail/mcp`** — governed MCP Tool bridge plus official MCP TypeScript SDK v2 HTTP/stdio client integration, with descriptor refresh/reclassification.
-- **`@axrail/agent`** — model-agnostic in-process Agent loop with append-only in-memory conversation history, sequential governed Tool execution, and provider-scoped Tool discovery.
+- **`@axrail/agent`** — model-agnostic in-process Agent loop with append-only in-memory conversation history, sequential governed Tool execution, failure-batch control, and provider-scoped Tool discovery.
 - **`@axrail/model-openai-compatible`** — provider adapter for OpenAI-compatible Responses APIs, including DeepSeek-compatible endpoints.
 - **`@axrail/hmi-adapter-kit`** — optional vendor-neutral HMI domain SDK built above `@axrail/adapter-sdk`; it is not a Harness/kernel dependency.
-- **`@axrail/cli`** — read-only diagnostic CLI foundation for EventStore inspection and ChangeSet evidence digests.
+- **`@axrail/cli`** — read-only diagnostic CLI for EventStore inspection and ChangeSet evidence digests.
 
-`@axrail/core` remains in the monorepo as **experimental capability/plugin kernel research**. It is not currently proposed as part of the supported v0.1 public package set because RFC-0004 capability/plugin semantics have not yet been fully converged with the working `@axrail/harness` / AdapterHost composition model.
+`@axrail/core` remains in the monorepo as **experimental capability/plugin kernel research**. It is private and not part of the supported v0.1 public package set because RFC-0004 capability/plugin semantics have not yet been fully converged with the working `@axrail/harness` / AdapterHost composition model.
 
-The original v0.1 functional scope is implemented, but package build/publish surfaces and versioning are still pre-release work. See [v0.1 Release Readiness](docs/release/v0.1-readiness.md) and the [proposed v0.1 Public API Surface](docs/release/v0.1-public-api.md).
+## Release candidate status
+
+The supported v0.1 package/API surface, TypeScript project-reference build strategy, and lockstep version policy are approved and implemented.
+
+The repository and 15 supported public package manifests are currently prepared as:
+
+```text
+0.1.0-rc.1
+```
+
+CI verifies on Node 20, 22, and 24:
+
+```text
+frozen install
+  ↓
+source type-check
+  ↓
+tsc -b ESM + declarations
+  ↓
+65 behavioral tests
+  ↓
+pack 15 package tarballs
+  ↓
+clean npm consumer install
+  ↓
+import every public package
+  ↓
+packaged axrail --version
+```
+
+The package dry run is green, including Apache-2.0 LICENSE text in public package tarballs. **No Axrail package has been published to npm and no Git tag/GitHub Release is implied by the prepared RC version.**
+
+See [v0.1 Release Readiness](docs/release/v0.1-readiness.md), [v0.1 Public API Surface](docs/release/v0.1-public-api.md), and [Release Hardening](docs/release/README.md).
 
 ## Development workspace: Kucell/axrail-agent
 
@@ -87,7 +119,7 @@ builds Axrail product/runtime
 
 Axrail packages must not import or depend on `Kucell/axrail-agent` at runtime.
 
-The two repositories also record different classes of logs:
+The two repositories record different classes of logs:
 
 - `Kucell/axrail-agent` records **development activity** such as implementation tasks, plans, CI results, code-review evidence, architecture decisions, and development handoffs.
 - Axrail `@axrail/events` records **product runtime execution** such as Agent sessions, Tool execution, Policy decisions, Approval, Transaction state, Commit, Rollback, and authoritative audit checkpoints.
@@ -175,13 +207,14 @@ Axrail software policy and approval are **not** substitutes for safety PLCs, int
 
 Physical and safety-critical actions must remain constrained by deterministic controls outside the model.
 
-## Architecture and RFCs
+## Architecture, release and RFCs
 
 - [Architecture overview](docs/architecture/README.md)
 - [Architecture and design](docs/architecture/design.md)
 - [Audit model](docs/audit-model.md)
+- [Release hardening](docs/release/README.md)
 - [v0.1 Release Readiness](docs/release/v0.1-readiness.md)
-- [Proposed v0.1 Public API Surface](docs/release/v0.1-public-api.md)
+- [v0.1 Public API Surface](docs/release/v0.1-public-api.md)
 - [RFC-0001: Artifact Model](rfcs/0001-artifact-model/README.md)
 - [RFC-0002: ChangeSet Protocol](rfcs/0002-changeset-protocol/README.md)
 - [RFC-0003: Transaction Runtime](rfcs/0003-transaction-runtime/README.md)
@@ -209,6 +242,7 @@ corepack enable
 pnpm install
 pnpm check
 pnpm test
+pnpm pack:smoke
 pnpm axrail --help
 ```
 
@@ -223,13 +257,14 @@ The v0.1 CLI is intentionally read-only/diagnostic; it does not provide a privil
 
 ## Current priorities
 
-The functional v0.1 scope and governed-execution P1 architecture gate are complete. Current release hardening focuses on:
+The functional scope, architecture gates, public API surface, package build, and clean-consumer RC dry run are complete. Remaining v0.1 release work is intentionally limited to the **public release boundary** tracked by #18:
 
-- finalizing the proposed public package/API surface (#17);
-- choosing the package build strategy and producing installable artifacts (#15);
-- expanding compatibility/package smoke CI (#16);
-- resolving or explicitly marking P2 architecture surfaces experimental (#20);
-- versioning/changelog/release automation (#18).
+- tag/GitHub Release policy and automation;
+- npm authentication through GitHub environments/secrets;
+- provenance/signing/attestation where supported;
+- explicit final maintainer approval before any registry publication.
+
+Until that boundary is crossed explicitly, Axrail remains **RC1 prepared, not published**.
 
 ## License
 
