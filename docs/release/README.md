@@ -13,9 +13,9 @@ Architecture P2 follow-up #20     ✓ resolved or explicitly scoped / closed
 Node 20/22/24 source CI           ✓ green
 Frozen pnpm lockfile              ✓ enforced
 Public API review #17             ✓ proposal complete / final decision open
-Package build #15                 analysis complete / decision open
+Package build #15                 analysis + package graph complete / decision open
 Versioning/release #18            policy draft complete / decision open
-Pack/install smoke #16            partially complete / waits on #15
+Pack/install smoke #16            smoke matrix defined / waits on #15 artifacts
 ```
 
 ## Release documents
@@ -23,6 +23,7 @@ Pack/install smoke #16            partially complete / waits on #15
 - [`v0.1-readiness.md`](v0.1-readiness.md) — release-readiness audit and blockers.
 - [`v0.1-public-api.md`](v0.1-public-api.md) — proposed supported package/API surface.
 - [`v0.1-build-strategy-analysis.md`](v0.1-build-strategy-analysis.md) — build architecture comparison and recommendation.
+- [`v0.1-package-graph.md`](v0.1-package-graph.md) — proposed package dependency topology, build layers, and clean-consumer smoke matrix.
 - [`v0.1-versioning-release-policy.md`](v0.1-versioning-release-policy.md) — release/versioning/tag/dry-run policy draft.
 - [`../../CHANGELOG.md`](../../CHANGELOG.md) — human-readable release-note source of truth.
 
