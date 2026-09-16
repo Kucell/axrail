@@ -104,10 +104,10 @@ export interface TransactionExecutor {
 export interface TransactionEvent {
   readonly type: string;
   readonly transactionId: string;
-  readonly changeSetId: string;
+  readonly changeSetId?: string;
   readonly sessionId?: string;
   readonly correlationId?: string;
-  readonly artifactRefs: readonly string[];
+  readonly artifactRefs?: readonly string[];
   readonly time: string;
   readonly state: TransactionState;
   readonly data?: unknown;
@@ -119,7 +119,10 @@ export interface TransactionRuntimeOptions {
   readonly policy?: TransactionPolicyEvaluator;
   readonly approval?: TransactionApprovalProvider;
   readonly validate?: (changeSet: ChangeSet, transaction: TransactionRecord) => Promise<ValidationResult>;
-  readonly onEvent?: (event: TransactionEvent) => Promise<void> | void;
+  readonly onEvent?: (
+    event: TransactionEvent,
+    transaction: TransactionRecord,
+  ) => Promise<void> | void;
   readonly allowWithoutPolicy?: boolean;
   readonly idFactory?: () => string;
   readonly now?: () => string;
