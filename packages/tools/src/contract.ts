@@ -12,6 +12,11 @@ export interface ToolExecutionContext {
   readonly sessionId?: string;
   readonly transactionId?: string;
   readonly actorId?: string;
+  /**
+   * Providers/adapters that are active for this execution scope. Resolution
+   * must select exactly one provider for the requested semantic Tool.
+   */
+  readonly providerIds?: readonly string[];
   readonly signal?: AbortSignal;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
@@ -64,8 +69,10 @@ export interface ToolResult<T = unknown> {
 }
 
 export interface ToolDefinition<TInput = unknown, TOutput = unknown> {
+  /** Semantic Tool identity, for example `hmi.screen.create`. */
   readonly name: string;
   readonly version?: string;
+  /** Concrete provider/adapter binding, separate from semantic identity. */
   readonly providerId?: string;
   readonly description: string;
   readonly risk: ToolRiskLevel;
@@ -86,5 +93,7 @@ export interface ToolDefinition<TInput = unknown, TOutput = unknown> {
 export interface ToolCall {
   readonly id: string;
   readonly name: string;
+  /** Optional explicit provider override for non-model callers. */
+  readonly providerId?: string;
   readonly input: unknown;
 }
