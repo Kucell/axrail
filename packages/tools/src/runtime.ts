@@ -6,7 +6,7 @@ import type {
   ToolResult,
 } from "./contract.js";
 import { createToolInvocationEnvelope } from "./invocation.js";
-import { ToolRegistry } from "./registry.js";
+import { ToolRegistry, ToolResolutionError } from "./registry.js";
 
 export interface ToolPolicyObligation {
   readonly type: string;
@@ -36,6 +36,7 @@ export interface ToolRuntimeEvent {
   readonly time: string;
   readonly callId: string;
   readonly toolName: string;
+  readonly providerId?: string;
   readonly sessionId?: string;
   readonly transactionId?: string;
   readonly correlationId?: string;
@@ -77,9 +78,13 @@ export class ToolRuntime {
 
     let tool: ToolDefinition<unknown, unknown>;
     try {
-      tool = this.registry.get(call.name);
+      tool = this.registry.get(call.name, {
+        providerId: call.providerId,
+        providerIds: context.providerIds,
+      });
     } catch (error) {
-      const result = failure("tool_not_found", messageOf(error));
+      const code = error instanceof ToolResolutionError ? error.code : "tool_not_found";
+      const result = failure(code, messageOf(error));
       await this.emit("tool.execution.failed", call, context, result.error);
       return result;
     }
@@ -95,6 +100,7 @@ export class ToolRuntime {
     }
 
     await this.emit("tool.invocation.prepared", call, context, {
+      providerId: invocation.providerId,
       risk: invocation.risk,
       effect: invocation.effect,
       evidenceDigest: invocation.evidenceDigest,
@@ -202,6 +208,7 @@ export class ToolRuntime {
     }
 
     await this.emit("tool.execution.started", call, context, {
+      providerId: invocation.providerId,
       risk: tool.risk,
       effect: tool.effect,
       evidenceDigest: invocation.evidenceDigest,
@@ -217,6 +224,7 @@ export class ToolRuntime {
       if (tool.validateResult) await tool.validateResult(value);
       const result: ToolResult = { ok: true, value };
       await this.emit("tool.execution.succeeded", call, context, {
+        providerId: invocation.providerId,
         risk: tool.risk,
         effect: tool.effect,
         evidenceDigest: invocation.evidenceDigest,
@@ -243,6 +251,7 @@ export class ToolRuntime {
         time: this.now(),
         callId: call.id,
         toolName: call.name,
+        providerId: invocation?.providerId ?? call.providerId,
         sessionId: invocation?.context.sessionId ?? context.sessionId,
         transactionId: invocation?.context.transactionId ?? context.transactionId,
         correlationId:
@@ -294,6 +303,7 @@ function executionContext(
     sessionId: invocation.context.sessionId,
     transactionId: invocation.context.transactionId,
     actorId: invocation.context.actorId,
+    providerIds: invocation.providerId ? [invocation.providerId] : undefined,
     signal,
     metadata: invocation.context.metadata,
   };
