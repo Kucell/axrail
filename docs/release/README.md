@@ -2,7 +2,7 @@
 
 This directory is the release-readiness entry point for Axrail v0.1.
 
-Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, the final pre-release architecture Gate has passed focused re-review, and the post-RC hardening follow-up is complete.
+Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, the final pre-release architecture Gate has passed focused re-review, the post-RC hardening follow-up is complete, and repository-side publication workflows are implemented.
 
 ## Current state
 
@@ -18,16 +18,20 @@ v0.1 lockstep version model       ✓ approved
 0.1.0-rc.1 no-publish dry run     ✓ package/runtime/TS smoke green
 Pre-release architecture #21      ✓ focused re-review passed / closed
 Post-RC hardening #22             ✓ completed / closed
-Version/release automation #18    ◐ publication mechanics remain open
+Publication workflows #18         ✓ repository-side mechanics implemented
+External npm/GitHub setup         ◐ required before first public publish
+Actual public release             ✗ not executed
 ```
 
-**Architecture and hardening release Gates: GO. Axrail remains unpublished until #18's explicit publication mechanics and maintainer publish decision are completed.**
+**Architecture, hardening and repository automation Gates are GO. Axrail remains unpublished until the npm scope, protected GitHub Environments, first-release bootstrap credentials, and explicit maintainer publication action are configured/executed.**
 
 No Axrail package has been published to an npm registry by this work.
 
 ## Release documents
 
-- [`v0.1-readiness.md`](v0.1-readiness.md) — current release-readiness state and remaining publication work.
+- [`v0.1-readiness.md`](v0.1-readiness.md) — current release-readiness state and remaining external publication setup.
+- [`npm-publication.md`](npm-publication.md) — operational first-publish bootstrap, Trusted Publisher, staged publishing, 2FA approval, and GitHub Release runbook.
+- [`notes/v0.1.0-rc.1.md`](notes/v0.1.0-rc.1.md) — prepared RC1 GitHub Release notes.
 - [`v0.1-public-api.md`](v0.1-public-api.md) — approved supported package/API surface.
 - [`v0.1-build-strategy-analysis.md`](v0.1-build-strategy-analysis.md) — approved build architecture analysis.
 - [`v0.1-package-graph.md`](v0.1-package-graph.md) — package dependency topology, build layers, and clean-consumer smoke matrix.
@@ -67,7 +71,7 @@ pnpm check
         ↓
 tsc -b project-reference build
         ↓
-73 behavioral tests
+behavioral tests
         ↓
 dependency-closure audit over emitted .js/.d.ts
         ↓
@@ -84,41 +88,59 @@ strict NodeNext TypeScript consumer compile
 packaged axrail --version
 ```
 
-CI #222 / Actions run `35093490803` passed the full flow on Node 20, 22 and 24. The packaged CLI reports `0.1.0-rc.1`. Public package artifacts intentionally omit source/declaration maps because source files are not shipped.
+CI #222 / Actions run `35093490803` passed the hardened runtime/package flow on Node 20, 22 and 24 with 73 behavioral tests. Publication workflow invariants are additionally covered by normal behavioral tests so later workflow edits cannot silently remove required Environments, OIDC, environment guards, immutable Action pins, or registry-before-tag ordering.
 
-## Final pre-release architecture Gate #21 — PASSED
+## Publication architecture
 
-The focused re-review closed the four release blockers:
+Because npm Trusted Publishing and staged publishing require a package to already exist, Axrail separates first publication from future releases:
 
-1. Transaction lifecycle observers are observational and cannot relabel an already committed effect.
-2. Tool timeout uses cooperative timeout-scoped cancellation and returns explicit `timeout` / `execution_uncertain` semantics.
-3. Adapter Policy providers are Host-scoped and multi-Adapter Transactions evaluate every Adapter policy scope with conservative aggregation.
-4. Packed artifacts pass strict downstream TypeScript declaration compilation and emitted dependency-closure verification.
+```text
+First release
+  release-bootstrap.yml
+    → verify exact tarballs
+    → protected npm-release-bootstrap Environment
+    → RELEASE_GUARD=enabled
+    → temporary NPM_TOKEN
+    → npm publish --tag rc --provenance
+    → revoke token
 
-## Post-RC hardening #22 — COMPLETED
+Future releases
+  release-stage.yml
+    → verify exact tarballs
+    → protected npm-release Environment
+    → RELEASE_GUARD=enabled
+    → OIDC Trusted Publisher
+    → npm stage publish
+    → npm maintainer 2FA approval
 
-Additional release-quality hardening now includes:
+After all npm packages are public
+  release-finalize.yml
+    → protected github-release Environment
+    → RELEASE_GUARD=enabled
+    → verify all 15 registry versions
+    → annotated Git tag
+    → GitHub Release
+```
 
-- Agent lifecycle observer isolation with explicit propagation mode for authoritative consumers;
-- postcondition/result-validation uncertainty semantics for side-effecting Tools;
-- explicit experimental Adapter SDK Host/Registry/ContextRegistry subpaths;
-- Node >=20 ESM-only support documentation;
-- no invalid source/declaration maps in v0.1 tarballs;
-- immutable commit pins for third-party Actions in CI and RC dry-run workflows;
-- explicit production EventStore limitations/guidance;
-- explicit strict audit-profile production guidance.
+The verified tarballs uploaded before an Environment approval are the same files consumed by the side-effecting publish/stage job; release jobs do not rebuild after approval.
 
-## Remaining publication work
+All third-party Actions in CI/release workflows are pinned to immutable commit SHAs.
 
-Issue #18 remains open for publication mechanics only:
+## External setup still required
 
-- Git tag and GitHub Release creation workflow;
-- npm authentication via repository environments/trusted publishing or secrets;
-- provenance/signing/attestation where supported;
-- final maintainer approval before registry publication;
-- first real package publication.
+Before the first public release, Issue #18 tracks the remaining account-level actions:
 
-The no-publish manual dry-run workflow remains intentionally unable to create tags/releases or publish packages.
+- verify/create npm ownership of the `@axrail` scope and all 15 names;
+- enable npm maintainer 2FA;
+- configure protected GitHub Environments `npm-release-bootstrap`, `npm-release`, and `github-release`;
+- set `RELEASE_GUARD=enabled` on each Environment;
+- put only the one-time short-lived bootstrap token in `npm-release-bootstrap` as `NPM_TOKEN`;
+- explicitly approve/run the bootstrap publication;
+- revoke the bootstrap token immediately after success;
+- configure each package's Trusted Publisher for `release-stage.yml` + `npm-release`, stage-only;
+- require 2FA and disallow traditional token publishing after Trusted Publishing is verified;
+- explicitly approve future staged packages with npm 2FA;
+- explicitly finalize the GitHub Release.
 
 ## Safety and compatibility reminder
 
