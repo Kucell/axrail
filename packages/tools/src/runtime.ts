@@ -234,6 +234,7 @@ export class ToolRuntime {
 
     const executionController = new AbortController();
     const unlinkCallerAbort = linkAbortSignal(context.signal, executionController);
+    let value: unknown;
 
     try {
       const execution = Promise.resolve(
@@ -242,18 +243,9 @@ export class ToolRuntime {
           executionContext(invocation, executionController.signal),
         ),
       );
-      const value = tool.timeoutMs
+      value = tool.timeoutMs
         ? await withTimeout(execution, tool.timeoutMs, executionController)
         : await execution;
-      if (tool.validateResult) await tool.validateResult(value);
-      const result: ToolResult = { ok: true, value };
-      await this.emit("tool.execution.succeeded", call, context, {
-        providerId: invocation.providerId,
-        risk: tool.risk,
-        effect: tool.effect,
-        evidenceDigest: invocation.evidenceDigest,
-      }, invocation);
-      return result;
     } catch (error) {
       if (error instanceof ToolTimeoutError) {
         const effectUncertain = invocation.effect !== "read";
@@ -265,6 +257,7 @@ export class ToolRuntime {
             ? `Tool timed out after ${error.timeoutMs}ms; side-effect outcome is uncertain`
             : `Tool timed out after ${error.timeoutMs}ms`,
           {
+            phase: "execution",
             timeoutMs: error.timeoutMs,
             abortRequested: true,
             effectUncertain,
@@ -278,6 +271,7 @@ export class ToolRuntime {
 
       if (context.signal?.aborted) {
         const result = failure("cancelled", "Tool execution was cancelled", {
+          phase: "execution",
           effectUncertain: invocation.effect !== "read",
           retrySafe: invocation.effect === "read" || tool.idempotent === true,
         });
@@ -285,12 +279,49 @@ export class ToolRuntime {
         return result;
       }
 
-      const result = failure("execution_failed", messageOf(error));
+      const result = failure("execution_failed", messageOf(error), {
+        phase: "execution",
+        effectUncertain: invocation.effect !== "read",
+        retrySafe: invocation.effect === "read" || tool.idempotent === true,
+      });
       await this.emit("tool.execution.failed", call, context, result.error, invocation);
       return result;
     } finally {
       unlinkCallerAbort();
     }
+
+    if (tool.validateResult) {
+      try {
+        await tool.validateResult(value);
+      } catch (error) {
+        const effectUncertain = invocation.effect !== "read";
+        const retrySafe = invocation.effect === "read" || tool.idempotent === true;
+        const code = effectUncertain ? "execution_uncertain" : "result_validation_failed";
+        const result = failure(
+          code,
+          effectUncertain
+            ? `Tool execution returned, but result validation failed; side-effect outcome is uncertain: ${messageOf(error)}`
+            : `Tool result validation failed: ${messageOf(error)}`,
+          {
+            phase: "result_validation",
+            effectUncertain,
+            retrySafe,
+          },
+        );
+        await this.emit("tool.result.validation_failed", call, context, result.error, invocation);
+        await this.emit("tool.execution.failed", call, context, result.error, invocation);
+        return result;
+      }
+    }
+
+    const result: ToolResult = { ok: true, value };
+    await this.emit("tool.execution.succeeded", call, context, {
+      providerId: invocation.providerId,
+      risk: tool.risk,
+      effect: tool.effect,
+      evidenceDigest: invocation.evidenceDigest,
+    }, invocation);
+    return result;
   }
 
   private async emit(
