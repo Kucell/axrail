@@ -57,6 +57,7 @@ export interface TransactionFailure {
 export type TransactionFailureCode =
   | "policy_unavailable"
   | "policy_denied"
+  | "policy_obligation_unsatisfied"
   | "approval_unavailable"
   | "approval_denied"
   | "approval_evidence_missing"
@@ -71,9 +72,15 @@ export type TransactionFailureCode =
   | "invalid_state"
   | "cancelled";
 
+export interface TransactionPolicyObligation {
+  readonly type: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+}
+
 export interface TransactionPolicyDecision {
   readonly effect: "allow" | "deny" | "require_approval";
   readonly reason?: string;
+  readonly obligations?: readonly TransactionPolicyObligation[];
 }
 
 export interface TransactionPolicyEvaluator {
