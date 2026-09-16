@@ -37,6 +37,7 @@ export class ApprovalService {
         decision: "expired",
         reason: "Approval request expired before evaluation",
         decidedAt: this.now(),
+        evidenceDigest: request.evidenceDigest,
       };
     }
 
@@ -52,6 +53,17 @@ export class ApprovalService {
 
     if (decision.requestId !== request.id) {
       throw new ApprovalError("request_mismatch", "Approval decision does not match the request id");
+    }
+
+    if (
+      request.evidenceDigest &&
+      decision.decision === "approved" &&
+      decision.evidenceDigest !== request.evidenceDigest
+    ) {
+      throw new ApprovalError(
+        "evidence_mismatch",
+        "Approval decision is not bound to the current execution evidence digest",
+      );
     }
 
     if (request.expiresAt && Date.parse(decision.decidedAt) > Date.parse(request.expiresAt)) {
@@ -74,6 +86,7 @@ export function isApprovalGranted(
   if (decision.requestId !== request.id) return false;
   if (decision.decision !== "approved") return false;
   if (request.expiresAt && Date.parse(now) > Date.parse(request.expiresAt)) return false;
+  if (request.evidenceDigest && decision.evidenceDigest !== request.evidenceDigest) return false;
   return true;
 }
 
