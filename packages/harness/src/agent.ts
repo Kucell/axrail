@@ -60,6 +60,7 @@ export class HarnessAgent {
         {
           actorId: options.actorId,
           transactionId: options.transactionId,
+          providerIds: options.providerIds,
           signal: options.signal,
           metadata: {
             ...options.metadata,
