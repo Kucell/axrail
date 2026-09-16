@@ -65,6 +65,7 @@ export type TransactionFailureCode =
   | "validation_failed"
   | "version_conflict"
   | "artifact_unavailable"
+  | "audit_unavailable"
   | "execution_failed"
   | "verification_failed"
   | "commit_failed"
@@ -136,6 +137,12 @@ export interface TransactionRuntimeOptions {
   readonly policy?: TransactionPolicyEvaluator;
   readonly approval?: TransactionApprovalProvider;
   readonly validate?: (changeSet: ChangeSet, transaction: TransactionRecord) => Promise<ValidationResult>;
+  readonly beforeApply?: (
+    transaction: TransactionRecord,
+  ) => Promise<void> | void;
+  readonly beforeCommit?: (
+    transaction: TransactionRecord,
+  ) => Promise<void> | void;
   readonly onEvent?: (
     event: TransactionEvent,
     transaction: TransactionRecord,
