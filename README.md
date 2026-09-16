@@ -29,23 +29,26 @@ The goal is not `model → tool → execute`. Important engineering changes beco
 
 ## Runtime foundation
 
-The current v0.1 foundation includes:
+The implemented v0.1 functional foundation includes:
 
 - **`@axrail/core`** — capability registry, plugin lifecycle, scopes, event bus, runtime shell.
 - **`@axrail/harness`** — high-level composition root that binds adapters, tools, policy, approval, events, sessions, agents, and transactions into an embeddable Harness runtime.
 - **`@axrail/tools`** — governed tool registry/execution, L0-L5 risk metadata, policy and approval hooks, fail-closed privileged execution.
 - **`@axrail/artifacts`** — portable engineering artifact identity, versions, snapshots, providers.
-- **`@axrail/changesets`** — structured engineering changes, operations, preconditions, risk metadata, and canonical digests.
+- **`@axrail/changesets`** — structured engineering changes, operations, preconditions, risk metadata, and canonical SHA-256 digests.
 - **`@axrail/validation`** — composable schema, semantic, domain, adapter, safety and post-execution validation stages.
 - **`@axrail/policy`** — deny-overrides policy composition with default-deny behavior.
 - **`@axrail/approval`** — approval requests, decisions, expiration, evidence binding, and fail-closed provider behavior.
 - **`@axrail/transactions`** — transaction state machine, optimistic concurrency, atomic/compensating/best-effort executors, validation/policy/approval bridges and explicit rollback.
-- **`@axrail/events`** — observable runtime event envelopes, EventStore contracts, session lifecycle, correlation, and replay.
-- **`@axrail/adapter-sdk`** — vendor-neutral adapter lifecycle and capability manifests (`exact`, `compatible`, `degraded`, `unsupported`).
-- **`@axrail/mcp`** — MCP tools bridged into the Axrail Tool Runtime instead of bypassing governance.
+- **`@axrail/events`** — observable runtime event envelopes, EventStore contracts, session lifecycle, correlation, replay, in-memory storage, and durable append-only JSONL storage.
+- **`@axrail/adapter-sdk`** — vendor-neutral adapter lifecycle, atomic mounting, context providers, and capability manifests (`exact`, `compatible`, `degraded`, `unsupported`).
+- **`@axrail/mcp`** — governed MCP tool bridge plus official MCP TypeScript SDK v2 HTTP/stdio client integration.
 - **`@axrail/agent`** — model-agnostic in-process agent loop with append-only session history and sequential governed tool execution.
+- **`@axrail/model-openai-compatible`** — provider adapter for OpenAI-compatible Responses APIs, including DeepSeek-compatible endpoints.
+- **`@axrail/hmi-adapter-kit`** — optional vendor-neutral HMI domain SDK built above `@axrail/adapter-sdk`; it is not a kernel dependency.
+- **`@axrail/cli`** — read-only diagnostic CLI foundation for EventStore inspection and ChangeSet evidence digests.
 
-APIs are still draft and may change before v1.0.
+The original v0.1 functional scope is implemented, but public APIs, package build/publish surfaces, and versioning are still draft and may change before a tagged release.
 
 ## Development workspace: Kucell/axrail-agent
 
@@ -90,11 +93,23 @@ The two repositories also record different classes of logs:
 
 A CI run produced while developing `@axrail/transactions` can be referenced by `axrail-agent`; a customer's runtime `transaction.committed` event belongs to the Axrail application's EventStore, not the development repository.
 
-## HMI reference flow
+## Vendor-neutral examples
+
+### Hello Agent
+
+[`examples/hello-agent`](examples/hello-agent/) is the smallest runnable example. It uses `HarnessRuntime`, a deterministic model, an L0 read Tool, and an L2 engineering-write Tool that requires approval.
+
+```bash
+pnpm --filter @axrail/example-hello-agent start
+```
+
+No API key or industrial hardware is required.
+
+### HMI reference flow
 
 HMI/SCADA is the first reference domain, not a dependency of the kernel.
 
-[`examples/hmi-agent`](examples/hmi-agent/) demonstrates a vendor-neutral path with no model API key and no proprietary HMI code:
+[`examples/hmi-agent`](examples/hmi-agent/) demonstrates a vendor-neutral path with no model API key and no proprietary HMI code. It now uses `@axrail/hmi-adapter-kit` for HMI capability names, artifact references, Tool contracts, and capability manifests.
 
 ```text
 Deterministic model
@@ -161,6 +176,7 @@ Physical and safety-critical actions must remain constrained by deterministic co
 ```text
 packages/       Runtime packages and SDKs
 examples/       Vendor-neutral reference integrations
+tests/          Cross-package behavioral tests
 docs/           Architecture and developer documentation
 rfcs/           Protocol and architecture proposals
 .github/        CI and repository automation
@@ -173,11 +189,21 @@ corepack enable
 pnpm install
 pnpm check
 pnpm test
+pnpm axrail --help
 ```
+
+Useful diagnostic commands:
+
+```bash
+pnpm axrail events inspect ./events.jsonl --correlation work-order-42
+pnpm axrail changeset digest ./changeset.json
+```
+
+The v0.1 CLI is intentionally read-only/diagnostic; it does not provide a privileged industrial side-effect bypass.
 
 ## Current priorities
 
-The next phase focuses on durable EventStore providers, approval freshness hardening, stronger adapter kits, and refining the product-runtime Agent management boundaries inside Axrail.
+The functional v0.1 scope is now complete. The next work should focus on **v0.1 release hardening**, especially package build/publish surfaces, public API review, versioning/release automation, documentation consistency, and security/reliability review before a tagged release.
 
 ## License
 
