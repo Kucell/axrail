@@ -2,7 +2,7 @@
 
 This directory is the release-readiness entry point for Axrail v0.1.
 
-Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, and the final pre-release architecture Gate has passed focused re-review.
+Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, the final pre-release architecture Gate has passed focused re-review, and the post-RC hardening follow-up is complete.
 
 ## Current state
 
@@ -15,12 +15,13 @@ Package build #15                 ✓ tsc -b ESM+d.ts / closed
 Pack/install smoke #16            ✓ Node 20/22/24 / closed
 Frozen pnpm lockfile              ✓ enforced
 v0.1 lockstep version model       ✓ approved
-0.1.0-rc.1 no-publish dry run     ✓ package/runtime smoke green
+0.1.0-rc.1 no-publish dry run     ✓ package/runtime/TS smoke green
 Pre-release architecture #21      ✓ focused re-review passed / closed
+Post-RC hardening #22             ✓ completed / closed
 Version/release automation #18    ◐ publication mechanics remain open
 ```
 
-**Architecture release Gate: GO. Axrail remains unpublished until #18's explicit publication mechanics and maintainer publish decision are completed.**
+**Architecture and hardening release Gates: GO. Axrail remains unpublished until #18's explicit publication mechanics and maintainer publish decision are completed.**
 
 No Axrail package has been published to an npm registry by this work.
 
@@ -66,7 +67,7 @@ pnpm check
         ↓
 tsc -b project-reference build
         ↓
-69 behavioral tests
+73 behavioral tests
         ↓
 dependency-closure audit over emitted .js/.d.ts
         ↓
@@ -76,12 +77,14 @@ clean npm consumer install
         ↓
 import every public package root
         ↓
+import documented Adapter SDK advanced subpaths
+        ↓
 strict NodeNext TypeScript consumer compile
         ↓
 packaged axrail --version
 ```
 
-CI #206 / Actions run `35090615025` passed the full flow on Node 20, 22 and 24. The packaged CLI reports `0.1.0-rc.1`.
+CI #222 / Actions run `35093490803` passed the full flow on Node 20, 22 and 24. The packaged CLI reports `0.1.0-rc.1`. Public package artifacts intentionally omit source/declaration maps because source files are not shipped.
 
 ## Final pre-release architecture Gate #21 — PASSED
 
@@ -92,14 +95,25 @@ The focused re-review closed the four release blockers:
 3. Adapter Policy providers are Host-scoped and multi-Adapter Transactions evaluate every Adapter policy scope with conservative aggregation.
 4. Packed artifacts pass strict downstream TypeScript declaration compilation and emitted dependency-closure verification.
 
-No new P1 regression was found in the focused re-review. Remaining architecture hardening is tracked as non-blocking follow-up rather than a release Gate.
+## Post-RC hardening #22 — COMPLETED
+
+Additional release-quality hardening now includes:
+
+- Agent lifecycle observer isolation with explicit propagation mode for authoritative consumers;
+- postcondition/result-validation uncertainty semantics for side-effecting Tools;
+- explicit experimental Adapter SDK Host/Registry/ContextRegistry subpaths;
+- Node >=20 ESM-only support documentation;
+- no invalid source/declaration maps in v0.1 tarballs;
+- immutable commit pins for third-party Actions in CI and RC dry-run workflows;
+- explicit production EventStore limitations/guidance;
+- explicit strict audit-profile production guidance.
 
 ## Remaining publication work
 
 Issue #18 remains open for publication mechanics only:
 
 - Git tag and GitHub Release creation workflow;
-- npm authentication via repository environments/secrets;
+- npm authentication via repository environments/trusted publishing or secrets;
 - provenance/signing/attestation where supported;
 - final maintainer approval before registry publication;
 - first real package publication.
@@ -116,7 +130,7 @@ Release hardening must not weaken governed execution in order to make packaging 
 - Policy obligations and approval quorum remain enforced;
 - strict audit profiles retain pre-effect/pre-commit checkpoints;
 - Adapter/validator/policy/provider scoping remains explicit;
-- timeout of a side-effecting Tool means effect uncertainty, not proven absence of effect;
+- timeout or failed postcondition of a side-effecting Tool can mean effect uncertainty, not proven absence of effect;
 - L4/L5 risk floors are not build-time configuration options.
 
 A package that installs correctly but bypasses these runtime guarantees is not a valid Axrail release artifact.
