@@ -1,0 +1,12 @@
+{
+  "name": "@axrail/model-openai-compatible",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@axrail/agent": "workspace:*"
+  },
+  "scripts": { "test": "node --input-type=module -e \"\"" }
+}
