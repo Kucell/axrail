@@ -28,6 +28,8 @@ export interface TransactionContext {
   readonly environment?: string;
   readonly adapterIds?: readonly string[];
   readonly expectedVersions?: Readonly<Record<string, string>>;
+  readonly sessionId?: string;
+  readonly correlationId?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly signal?: AbortSignal;
 }
@@ -96,15 +98,16 @@ export interface TransactionExecutor {
   apply(transaction: TransactionRecord): Promise<TransactionApplyResult> | TransactionApplyResult;
   verify?(transaction: TransactionRecord, result: TransactionApplyResult): Promise<boolean> | boolean;
   commit?(transaction: TransactionRecord, result: TransactionApplyResult): Promise<void> | void;
-  rollback?(
-    transaction: TransactionRecord,
-    result?: TransactionApplyResult,
-  ): Promise<TransactionRollbackResult> | TransactionRollbackResult;
+  rollback?(transaction: TransactionRecord, result?: TransactionApplyResult): Promise<TransactionRollbackResult> | TransactionRollbackResult;
 }
 
 export interface TransactionEvent {
   readonly type: string;
   readonly transactionId: string;
+  readonly changeSetId: string;
+  readonly sessionId?: string;
+  readonly correlationId?: string;
+  readonly artifactRefs: readonly string[];
   readonly time: string;
   readonly state: TransactionState;
   readonly data?: unknown;
