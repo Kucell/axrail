@@ -1,1 +1,16 @@
-{"name":"@axrail/example-hello-agent","version":"0.0.0","private":true,"type":"module","scripts":{"test":"node --input-type=module -e \"\""}}
+{
+  "name": "@axrail/example-hello-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@axrail/adapter-sdk": "workspace:*",
+    "@axrail/agent": "workspace:*",
+    "@axrail/approval": "workspace:*",
+    "@axrail/harness": "workspace:*"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "test": "node --input-type=module -e \"\""
+  }
+}
