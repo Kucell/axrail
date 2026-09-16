@@ -248,8 +248,8 @@ const toolRuntime = new ToolRuntime({
   // transaction. The transaction independently evaluates engineering policy,
   // validation, and approval before committing the artifact.
   policy: {
-    evaluate(tool) {
-      return tool.name === HMI_CAPABILITIES.SCREEN_CREATE
+    evaluate(invocation) {
+      return invocation.toolName === HMI_CAPABILITIES.SCREEN_CREATE
         ? { allow: true }
         : { allow: false, reason: "Tool is not allowed in this example" };
     },
