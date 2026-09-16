@@ -11,9 +11,15 @@ async function workflow(name: string): Promise<string> {
   return readFile(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
 }
 
+function requireEnvironmentGuard(source: string): void {
+  assert.match(source, /vars\.RELEASE_GUARD/);
+  assert.match(source, /test "\$RELEASE_GUARD" = "enabled"/);
+}
+
 test("bootstrap release is protected, provenance-enabled and token-scoped", async () => {
   const source = await workflow("release-bootstrap.yml");
   assert.match(source, /environment: npm-release-bootstrap/);
+  requireEnvironmentGuard(source);
   assert.match(source, /id-token: write/);
   assert.match(source, /secrets\.NPM_TOKEN/);
   assert.match(source, /npm publish .*--access public --tag rc --provenance/);
@@ -25,6 +31,7 @@ test("bootstrap release is protected, provenance-enabled and token-scoped", asyn
 test("trusted release stages through OIDC without a long-lived npm token", async () => {
   const source = await workflow("release-stage.yml");
   assert.match(source, /environment: npm-release/);
+  requireEnvironmentGuard(source);
   assert.match(source, /id-token: write/);
   assert.match(source, /npm stage publish .*--access public --tag "\$DIST_TAG" --provenance/);
   assert.doesNotMatch(source, /NPM_TOKEN/);
@@ -35,6 +42,7 @@ test("trusted release stages through OIDC without a long-lived npm token", async
 test("GitHub release finalizer verifies registry state before tag creation", async () => {
   const source = await workflow("release-finalize.yml");
   assert.match(source, /environment: github-release/);
+  requireEnvironmentGuard(source);
   assert.match(source, /contents: write/);
   assert.match(source, /npm view "@axrail\/\$\{package\}@\$\{VERSION\}" version/);
   assert.match(source, /git tag -a "v\$\{VERSION\}"/);
