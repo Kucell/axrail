@@ -15,6 +15,7 @@ import type {
 } from "./types.js";
 
 export type AgentToolFailureMode = "stop" | "continue";
+export type AgentEventFailureMode = "ignore" | "propagate";
 
 export interface AgentLoopOptions {
   readonly model: AgentModelProvider;
@@ -26,6 +27,12 @@ export interface AgentLoopOptions {
    * an earlier Tool failure. Defaults to `stop` for safer industrial behavior.
    */
   readonly toolFailureMode?: AgentToolFailureMode;
+  /**
+   * Ordinary AgentLoop events are observational by default and cannot change
+   * execution truth after a Tool side effect. Authoritative consumers such as
+   * Harness Session persistence may explicitly opt into `propagate`.
+   */
+  readonly eventFailureMode?: AgentEventFailureMode;
   readonly now?: () => string;
   readonly onEvent?: (event: AgentEvent) => Promise<void> | void;
 }
@@ -36,6 +43,7 @@ export class AgentLoop {
   private readonly systemPrompt?: string;
   private readonly maxSteps: number;
   private readonly toolFailureMode: AgentToolFailureMode;
+  private readonly eventFailureMode: AgentEventFailureMode;
   private readonly now: () => string;
   private readonly onEvent?: AgentLoopOptions["onEvent"];
 
@@ -45,6 +53,7 @@ export class AgentLoop {
     this.systemPrompt = options.systemPrompt;
     this.maxSteps = options.maxSteps ?? 16;
     this.toolFailureMode = options.toolFailureMode ?? "stop";
+    this.eventFailureMode = options.eventFailureMode ?? "ignore";
     if (this.maxSteps < 1) throw new Error("Agent maxSteps must be at least 1");
     this.now = options.now ?? (() => new Date().toISOString());
     this.onEvent = options.onEvent;
@@ -189,10 +198,20 @@ export class AgentLoop {
     };
   }
 
-  private emit(sessionId: string, type: string, step?: number, data?: unknown): Promise<void> {
-    return Promise.resolve(
-      this.onEvent?.({ type, sessionId, time: this.now(), step, data }),
-    );
+  private async emit(
+    sessionId: string,
+    type: string,
+    step?: number,
+    data?: unknown,
+  ): Promise<void> {
+    if (!this.onEvent) return;
+    try {
+      await this.onEvent({ type, sessionId, time: this.now(), step, data });
+    } catch (error) {
+      if (this.eventFailureMode === "propagate") throw error;
+      // Ordinary AgentLoop telemetry is observational by default. Harness
+      // Session persistence opts into propagation explicitly.
+    }
   }
 }
 
