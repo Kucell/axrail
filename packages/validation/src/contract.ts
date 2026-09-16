@@ -26,12 +26,19 @@ export interface ValidationResult {
 export interface ValidationContext {
   readonly stage?: ValidationStage;
   readonly environment?: string;
+  /** Active Adapter/provider scope for provider-bound validators. */
+  readonly providerIds?: readonly string[];
   readonly signal?: AbortSignal;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface Validator<T = unknown> {
   readonly id: string;
+  /**
+   * Optional provider/Adapter identity. Validators without a provider are
+   * global and run in every compatible validation scope.
+   */
+  readonly providerId?: string;
   readonly stage?: ValidationStage;
   readonly order?: number;
   supports?(value: T, context: ValidationContext): boolean;
