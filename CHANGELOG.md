@@ -2,7 +2,7 @@
 
 All notable changes to Axrail will be documented in this file.
 
-This project is pre-release. The current development line targets the first `0.1.0` release. Package/API and build decisions are still being finalized; entries under **Unreleased** describe implemented repository state, not a published package guarantee.
+This project is pre-release. The repository and 15 supported public package manifests are currently prepared as `0.1.0-rc.1`, and the candidate artifacts have passed a no-publish dry run. No npm package or GitHub Release is implied by this changelog until an explicit release/tag action occurs.
 
 ## [Unreleased]
 
@@ -21,11 +21,15 @@ This project is pre-release. The current development line targets the first `0.1
 - Read-only diagnostic CLI for EventStore inspection and ChangeSet digest calculation.
 - Provider-aware Validator scoping and explicit scoped Adapter context retrieval.
 - Node 20 / 22 / 24 CI matrix with frozen pnpm lockfile verification.
+- TypeScript project-reference build graph producing NodeNext ESM JavaScript and declaration files for the 15 supported public packages.
+- Clean-consumer tarball install/import smoke testing for every public package and the packaged CLI.
+- Manual `Release Candidate Dry Run` workflow that retains verified package tarballs as GitHub Actions artifacts without publishing them.
 
 ### Changed
 
-- `@axrail/harness` + `AdapterHost` are the supported v0.1 runtime composition direction; `@axrail/core` is explicitly experimental/internal for the first public release proposal.
-- Agent same-turn Tool calls remain sequential and now stop the remaining Tool batch after the first failure by default, allowing the model to replan. `toolFailureMode: "continue"` is an explicit opt-in.
+- `@axrail/harness` + `AdapterHost` are the supported v0.1 runtime composition model; `@axrail/core` is explicitly experimental/internal and excluded from the supported public package set.
+- The 15 supported public packages now use lockstep `0.1.0-rc.1` manifests and built `dist` entry points.
+- Agent same-turn Tool calls remain sequential and stop the remaining Tool batch after the first failure by default, allowing the model to replan. `toolFailureMode: "continue"` is an explicit opt-in.
 - Adapter unmount drains local provider surfaces before external Adapter shutdown begins.
 - AbortSignal transaction cancellation now emits the normal `transaction.cancelled` transition/event.
 - MCP same-name Tool descriptor changes now trigger re-registration and risk re-classification.
@@ -40,8 +44,11 @@ This project is pre-release. The current development line targets the first `0.1
 
 ### Release preparation
 
-- v0.1 public package/API surface proposal documented in `docs/release/v0.1-public-api.md`.
-- v0.1 release readiness documented in `docs/release/v0.1-readiness.md`.
-- versioning/release policy draft documented in `docs/release/v0.1-versioning-release-policy.md`.
+- v0.1 public package/API surface approved and documented in `docs/release/v0.1-public-api.md`.
+- TypeScript project-reference build strategy approved and implemented.
+- Lockstep v0.1 versioning/release policy approved and documented in `docs/release/v0.1-versioning-release-policy.md`.
+- `0.1.0-rc.1` no-publish dry run passed on Node 20, 22 and 24 with 65 behavioral tests and 15 clean-installed package tarballs.
+- Apache-2.0 license text is carried with each supported public package artifact.
+- Real registry publication, release tags, GitHub Releases, credentials and provenance automation remain separate explicit release actions.
 
 [Unreleased]: https://github.com/Kucell/axrail/compare/main...HEAD
