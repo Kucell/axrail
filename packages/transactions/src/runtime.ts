@@ -317,11 +317,15 @@ export class TransactionHandle {
     const event: TransactionEvent = {
       type: `transaction.${state}`,
       transactionId: this.record.id,
+      changeSetId: this.record.changeSet.id,
+      sessionId: this.record.context.sessionId,
+      correlationId: this.record.context.correlationId,
+      artifactRefs: this.record.changeSet.artifacts.map((artifact) => artifact.id),
       time: this.record.updatedAt,
       state,
       data,
     };
-    await this.options.onEvent?.(event);
+    await this.options.onEvent?.(event, this.snapshot());
   }
 }
 
