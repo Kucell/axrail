@@ -56,6 +56,8 @@ export class TransactionRuntime {
       await tx.commit();
     } catch {
       // State and failure are recorded by the phase that failed.
+      // Recovery/rollback is intentionally explicit in v0.1 because adapters
+      // may represent physical or non-atomic side effects.
     }
     return tx.snapshot();
   }
@@ -200,6 +202,11 @@ export class TransactionHandle {
     }
     this.expect("approved");
     this.throwIfCancelled();
+
+    // The last safe optimistic-concurrency check for all transaction modes.
+    // Compensating/best-effort adapters may mutate the authoritative artifact
+    // during apply(), so the baseline version is no longer a valid commit-time
+    // comparison for those modes.
     await this.checkConcurrency();
     await this.transition("applying");
 
@@ -230,7 +237,11 @@ export class TransactionHandle {
   async commit(): Promise<void> {
     this.expect("verifying");
     this.throwIfCancelled();
-    await this.checkConcurrency();
+
+    // Atomic executors are expected to stage without changing the externally
+    // visible artifact version, so a final baseline check remains meaningful.
+    if (this.record.mode === "atomic") await this.checkConcurrency();
+
     try {
       await this.options.executor.commit?.(this.snapshot(), this.applyResult ?? {});
       await this.transition("committed");
