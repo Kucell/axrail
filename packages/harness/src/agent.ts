@@ -40,8 +40,11 @@ export class HarnessAgent {
       tools: this.harness.tools,
       systemPrompt: this.options.systemPrompt,
       maxSteps: this.options.maxSteps,
+      eventFailureMode: "propagate",
       now: () => this.harness.currentTime(),
       onEvent: async (event) => {
+        // Harness Session events are replayable application state, not optional
+        // telemetry. AgentLoop therefore propagates failures for this binding.
         await this.harness.sessions.append(session.id, {
           type: event.type,
           source: "agent",
