@@ -93,10 +93,13 @@ export interface TransactionExecutor {
   readonly id: string;
   readonly mode: TransactionMode;
   prepare?(transaction: TransactionRecord): Promise<void> | void;
-  apply(transaction: TransactionRecord): Promise<TransactionApplyResult>;
+  apply(transaction: TransactionRecord): Promise<TransactionApplyResult> | TransactionApplyResult;
   verify?(transaction: TransactionRecord, result: TransactionApplyResult): Promise<boolean> | boolean;
   commit?(transaction: TransactionRecord, result: TransactionApplyResult): Promise<void> | void;
-  rollback?(transaction: TransactionRecord, result?: TransactionApplyResult): Promise<TransactionRollbackResult>;
+  rollback?(
+    transaction: TransactionRecord,
+    result?: TransactionApplyResult,
+  ): Promise<TransactionRollbackResult> | TransactionRollbackResult;
 }
 
 export interface TransactionEvent {
