@@ -290,6 +290,7 @@ class HarnessToolPolicy implements ToolPolicyEvaluator {
         allow: false,
         code: "policy_denied",
         reason: decision.reason,
+        obligations: decision.obligations,
       };
     }
 
@@ -297,6 +298,7 @@ class HarnessToolPolicy implements ToolPolicyEvaluator {
       allow: true,
       requireApproval: decision.effect === "require-approval",
       reason: decision.reason,
+      obligations: decision.obligations,
     };
   }
 }
