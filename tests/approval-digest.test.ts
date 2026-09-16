@@ -133,4 +133,91 @@ test("Transaction approval bridge binds approval to current ChangeSet digest", a
 
   assert.equal(result.state, "committed");
   assert.match(observedDigest ?? "", /^sha256:[0-9a-f]{64}$/);
+  assert.equal(result.approvedEvidenceDigest, observedDigest);
+});
+
+test("Transaction snapshots ChangeSet before caller mutation", async () => {
+  const original: ChangeSet = {
+    id: "cs-snapshot",
+    protocolVersion: "0.1",
+    artifacts: [],
+    operations: [
+      {
+        op: "update",
+        target: "motor:1",
+        value: { speed: 100 },
+      },
+    ],
+  };
+
+  let appliedTarget: string | undefined;
+  let appliedSpeed: unknown;
+  const runtime = new TransactionRuntime({
+    allowWithoutPolicy: true,
+    executor: {
+      id: "snapshot-executor",
+      mode: "atomic",
+      apply(transaction) {
+        const operation = transaction.changeSet.operations[0];
+        appliedTarget = operation.target;
+        appliedSpeed = (operation.value as { speed?: unknown }).speed;
+        return {};
+      },
+    },
+  });
+
+  const handle = runtime.begin(original);
+  (original.operations as Array<{ target: string; value?: unknown }>)[0].target = "motor:changed";
+  ((original.operations[0].value as { speed: number }).speed) = 999;
+
+  await handle.prepare();
+  await handle.evaluatePolicy();
+  await handle.validate();
+  await handle.apply();
+  await handle.verify();
+  await handle.commit();
+
+  assert.equal(appliedTarget, "motor:1");
+  assert.equal(appliedSpeed, 100);
+  assert.equal(Object.isFrozen(handle.snapshot().changeSet), true);
+  assert.equal(Object.isFrozen(handle.snapshot().changeSet.operations), true);
+  assert.equal(Object.isFrozen(handle.snapshot().changeSet.operations[0]), true);
+});
+
+test("Transaction rejects stale approval evidence before apply", async () => {
+  let applied = false;
+  const runtime = new TransactionRuntime({
+    policy: {
+      evaluate() {
+        return { effect: "require_approval" };
+      },
+    },
+    approval: {
+      approve() {
+        return {
+          approved: true,
+          evidenceDigest: "sha256:stale",
+        };
+      },
+    },
+    executor: {
+      id: "stale-approval-executor",
+      mode: "atomic",
+      apply() {
+        applied = true;
+        return {};
+      },
+    },
+  });
+
+  const result = await runtime.execute({
+    id: "cs-stale",
+    protocolVersion: "0.1",
+    artifacts: [],
+    operations: [{ op: "update", target: "screen:1" }],
+  });
+
+  assert.equal(result.state, "failed");
+  assert.equal(result.error?.code, "approval_evidence_mismatch");
+  assert.equal(applied, false);
 });
