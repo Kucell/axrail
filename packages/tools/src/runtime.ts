@@ -51,6 +51,9 @@ export interface ToolRuntimeOptions {
   readonly registry?: ToolRegistry;
   readonly policy?: ToolPolicyEvaluator;
   readonly approval?: ToolApprovalProvider;
+  readonly beforeExecute?: (
+    invocation: ToolInvocationEnvelope,
+  ) => Promise<void> | void;
   readonly now?: () => string;
   readonly onEvent?: (event: ToolRuntimeEvent) => Promise<void> | void;
 }
@@ -59,6 +62,7 @@ export class ToolRuntime {
   readonly registry: ToolRegistry;
   private readonly policy?: ToolPolicyEvaluator;
   private readonly approval?: ToolApprovalProvider;
+  private readonly beforeExecute?: ToolRuntimeOptions["beforeExecute"];
   private readonly now: () => string;
   private readonly onEvent?: ToolRuntimeOptions["onEvent"];
 
@@ -66,6 +70,7 @@ export class ToolRuntime {
     this.registry = options.registry ?? new ToolRegistry();
     this.policy = options.policy;
     this.approval = options.approval;
+    this.beforeExecute = options.beforeExecute;
     this.now = options.now ?? (() => new Date().toISOString());
     this.onEvent = options.onEvent;
   }
@@ -207,6 +212,19 @@ export class ToolRuntime {
       }
     }
 
+    if (this.beforeExecute) {
+      try {
+        await this.beforeExecute(invocation);
+      } catch (error) {
+        const result = failure(
+          "audit_unavailable",
+          `Required pre-execution checkpoint failed: ${messageOf(error)}`,
+        );
+        await this.emit("tool.execution.failed", call, context, result.error, invocation);
+        return result;
+      }
+    }
+
     await this.emit("tool.execution.started", call, context, {
       providerId: invocation.providerId,
       risk: tool.risk,
@@ -264,8 +282,8 @@ export class ToolRuntime {
         data,
       });
     } catch {
-      // Runtime instrumentation is observational in v0.1. Durable audit modes
-      // can impose fail-closed persistence at the Harness/commit boundary.
+      // Ordinary lifecycle events are observational. Deployments that require
+      // durable evidence use the authoritative beforeExecute checkpoint.
     }
   }
 }
