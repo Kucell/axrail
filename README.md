@@ -6,6 +6,10 @@ Axrail is open-source harness infrastructure for AI agents that safely understan
 
 > Axrail puts a governed execution boundary between model intent and engineering side effects.
 
+## Runtime support
+
+Axrail v0.1 targets **Node.js 20 or newer** and is **ESM-only**. Public packages expose ESM `import` entry points; CommonJS `require()` entry points are not part of the v0.1 supported surface.
+
 ## Execution model
 
 ```text
@@ -32,17 +36,17 @@ The goal is not `model → tool → execute`. Important engineering changes beco
 The implemented v0.1 foundation includes:
 
 - **`@axrail/harness`** — primary high-level composition root that binds adapters, tools, policy, approval, events, sessions, agents, transactions, provider-aware Tool routing, and explicit audit profiles into an embeddable Harness runtime.
-- **`@axrail/tools`** — governed Tool registry/execution, immutable Tool invocation evidence, provider-aware semantic Tool resolution, L0-L5 risk metadata, policy/approval hooks, and fail-closed privileged execution.
+- **`@axrail/tools`** — governed Tool registry/execution, immutable Tool invocation evidence, provider-aware semantic Tool resolution, L0-L5 risk metadata, policy/approval hooks, explicit timeout/effect-uncertainty semantics, and fail-closed privileged execution.
 - **`@axrail/artifacts`** — portable engineering artifact identity, versions, snapshots, providers.
 - **`@axrail/changesets`** — structured engineering changes, operations, preconditions, risk metadata, immutable snapshots, and canonical SHA-256 digests.
 - **`@axrail/validation`** — composable schema, semantic, domain, adapter, safety and post-execution validation stages with provider-aware Adapter scoping.
 - **`@axrail/policy`** — deny-overrides policy composition with default-deny behavior and deterministic obligations.
 - **`@axrail/approval`** — approval requests, quorum/role requirements, expiration, evidence binding, and fail-closed provider behavior.
 - **`@axrail/transactions`** — transaction state machine, immutable ChangeSet evidence, optimistic concurrency, atomic/compensating/best-effort executors, validation/policy/approval bridges, audit checkpoints, and explicit rollback.
-- **`@axrail/events`** — observable runtime event envelopes, EventStore contracts, session lifecycle, correlation, replay, in-memory storage, and durable append-only JSONL storage.
+- **`@axrail/events`** — observable runtime event envelopes, EventStore contracts, session lifecycle, correlation, replay, in-memory storage, and durable append-only JSONL reference storage.
 - **`@axrail/adapter-sdk`** — vendor-neutral Adapter lifecycle, atomic mounting, provider binding, explicit context retrieval, and capability manifests (`exact`, `compatible`, `degraded`, `unsupported`).
 - **`@axrail/mcp`** — governed MCP Tool bridge plus official MCP TypeScript SDK v2 HTTP/stdio client integration, with descriptor refresh/reclassification.
-- **`@axrail/agent`** — model-agnostic in-process Agent loop with append-only in-memory conversation history, sequential governed Tool execution, failure-batch control, and provider-scoped Tool discovery.
+- **`@axrail/agent`** — model-agnostic in-process Agent loop with append-only in-memory conversation history, sequential governed Tool execution, failure-batch control, provider-scoped Tool discovery, and observational event isolation by default.
 - **`@axrail/model-openai-compatible`** — provider adapter for OpenAI-compatible Responses APIs, including DeepSeek-compatible endpoints.
 - **`@axrail/hmi-adapter-kit`** — optional vendor-neutral HMI domain SDK built above `@axrail/adapter-sdk`; it is not a Harness/kernel dependency.
 - **`@axrail/cli`** — read-only diagnostic CLI for EventStore inspection and ChangeSet evidence digests.
@@ -68,20 +72,24 @@ source type-check
   ↓
 tsc -b ESM + declarations
   ↓
-65 behavioral tests
+69 behavioral tests
+  ↓
+package dependency-closure audit
   ↓
 pack 15 package tarballs
   ↓
 clean npm consumer install
   ↓
-import every public package
+runtime import every public package
+  ↓
+strict NodeNext TypeScript consumer compile
   ↓
 packaged axrail --version
 ```
 
 The package dry run is green, including Apache-2.0 LICENSE text in public package tarballs. **No Axrail package has been published to npm and no Git tag/GitHub Release is implied by the prepared RC version.**
 
-See [v0.1 Release Readiness](docs/release/v0.1-readiness.md), [v0.1 Public API Surface](docs/release/v0.1-public-api.md), and [Release Hardening](docs/release/README.md).
+See [v0.1 Release Readiness](docs/release/v0.1-readiness.md), [v0.1 Public API Surface](docs/release/v0.1-public-api.md), [Execution Boundary Semantics](docs/execution-semantics.md), and [Release Hardening](docs/release/README.md).
 
 ## Development workspace: Kucell/axrail-agent
 
@@ -199,6 +207,8 @@ required_before_commit
 
 Strict profiles persist authoritative `audit.effect.checkpoint` / `audit.commit.checkpoint` records before protected execution boundaries. Ordinary post-effect lifecycle events remain observational so an EventStore telemetry failure cannot falsely claim that an already-applied effect did not occur.
 
+`best_effort` is the default development/embedded profile, not a production safety recommendation. For deployment, physical-action, safety-sensitive, regulated, or otherwise audit-dependent environments, select an explicit strict profile and provide an EventStore with durability properties appropriate to the application.
+
 See [Audit Model](docs/audit-model.md).
 
 ## Safety boundary
@@ -211,6 +221,7 @@ Physical and safety-critical actions must remain constrained by deterministic co
 
 - [Architecture overview](docs/architecture/README.md)
 - [Architecture and design](docs/architecture/design.md)
+- [Execution boundary semantics](docs/execution-semantics.md)
 - [Audit model](docs/audit-model.md)
 - [Release hardening](docs/release/README.md)
 - [v0.1 Release Readiness](docs/release/v0.1-readiness.md)
@@ -257,9 +268,12 @@ The v0.1 CLI is intentionally read-only/diagnostic; it does not provide a privil
 
 ## Current priorities
 
-The functional scope, architecture gates, public API surface, package build, and clean-consumer RC dry run are complete. Remaining v0.1 release work is intentionally limited to the **public release boundary** tracked by #18:
+The functional scope, architecture gates, public API surface, package build, and clean-consumer RC dry run are complete. Remaining v0.1 release work is intentionally limited to the **public release boundary** tracked by #18. Non-blocking post-RC hardening is tracked separately in #22.
+
+Before any credentialed publication workflow, Axrail will require:
 
 - tag/GitHub Release policy and automation;
+- immutable commit pins for third-party Actions;
 - npm authentication through GitHub environments/secrets;
 - provenance/signing/attestation where supported;
 - explicit final maintainer approval before any registry publication.
