@@ -2,8 +2,10 @@ import type {
   ToolCall,
   ToolDefinition,
   ToolExecutionContext,
+  ToolInvocationEnvelope,
   ToolResult,
 } from "./contract.js";
+import { createToolInvocationEnvelope } from "./invocation.js";
 import { ToolRegistry } from "./registry.js";
 
 export interface ToolPolicyDecision {
@@ -15,18 +17,12 @@ export interface ToolPolicyDecision {
 
 export interface ToolPolicyEvaluator {
   evaluate(
-    tool: ToolDefinition<unknown, unknown>,
-    call: ToolCall,
-    context: ToolExecutionContext,
+    invocation: ToolInvocationEnvelope,
   ): Promise<ToolPolicyDecision> | ToolPolicyDecision;
 }
 
 export interface ToolApprovalProvider {
-  approve(
-    tool: ToolDefinition<unknown, unknown>,
-    call: ToolCall,
-    context: ToolExecutionContext,
-  ): Promise<boolean> | boolean;
+  approve(invocation: ToolInvocationEnvelope): Promise<boolean> | boolean;
 }
 
 export interface ToolRuntimeEvent {
@@ -38,6 +34,9 @@ export interface ToolRuntimeEvent {
   readonly transactionId?: string;
   readonly correlationId?: string;
   readonly actorId?: string;
+  readonly evidenceDigest?: string;
+  readonly target?: string;
+  readonly artifactRefs?: readonly string[];
   readonly data?: unknown;
 }
 
@@ -79,18 +78,27 @@ export class ToolRuntime {
       return result;
     }
 
-    let input: unknown = call.input;
+    let invocation: ToolInvocationEnvelope;
     try {
-      input = tool.validateInput ? tool.validateInput(call.input) : call.input;
+      const effectiveInput = tool.validateInput ? tool.validateInput(call.input) : call.input;
+      invocation = await createToolInvocationEnvelope(tool, call, effectiveInput, context);
     } catch (error) {
       const result = failure("invalid_input", messageOf(error));
       await this.emit("tool.execution.failed", call, context, result.error);
       return result;
     }
 
+    await this.emit("tool.invocation.prepared", call, context, {
+      risk: invocation.risk,
+      effect: invocation.effect,
+      evidenceDigest: invocation.evidenceDigest,
+      target: invocation.target,
+      artifactRefs: invocation.artifactRefs,
+    }, invocation);
+
     if (context.signal?.aborted) {
       const result = failure("cancelled", "Tool execution was cancelled before start");
-      await this.emit("tool.execution.cancelled", call, context, result.error);
+      await this.emit("tool.execution.cancelled", call, context, result.error, invocation);
       return result;
     }
 
@@ -103,13 +111,14 @@ export class ToolRuntime {
         allow: false,
         code: result.error?.code,
         risk: tool.risk,
-      });
-      await this.emit("tool.execution.failed", call, context, result.error);
+        evidenceDigest: invocation.evidenceDigest,
+      }, invocation);
+      await this.emit("tool.execution.failed", call, context, result.error, invocation);
       return result;
     }
 
     const decision: ToolPolicyDecision = this.policy
-      ? await this.policy.evaluate(tool, call, context)
+      ? await this.policy.evaluate(invocation)
       : { allow: true };
 
     await this.emit("tool.policy.evaluated", call, context, {
@@ -118,19 +127,24 @@ export class ToolRuntime {
       requireApproval: decision.requireApproval ?? false,
       reason: decision.reason,
       risk: tool.risk,
-    });
+      evidenceDigest: invocation.evidenceDigest,
+    }, invocation);
 
     if (!decision.allow) {
       const result = failure(
         decision.code ?? "policy_denied",
         decision.reason ?? "Tool execution denied by policy",
       );
-      await this.emit("tool.execution.failed", call, context, result.error);
+      await this.emit("tool.execution.failed", call, context, result.error, invocation);
       return result;
     }
 
     if (decision.requireApproval) {
-      await this.emit("tool.approval.requested", call, context, { risk: tool.risk });
+      await this.emit("tool.approval.requested", call, context, {
+        risk: tool.risk,
+        evidenceDigest: invocation.evidenceDigest,
+        target: invocation.target,
+      }, invocation);
       if (!this.approval) {
         const result = failure(
           "approval_unavailable",
@@ -139,15 +153,19 @@ export class ToolRuntime {
         await this.emit("tool.approval.completed", call, context, {
           approved: false,
           code: result.error?.code,
-        });
-        await this.emit("tool.execution.failed", call, context, result.error);
+          evidenceDigest: invocation.evidenceDigest,
+        }, invocation);
+        await this.emit("tool.execution.failed", call, context, result.error, invocation);
         return result;
       }
-      const approved = await this.approval.approve(tool, call, context);
-      await this.emit("tool.approval.completed", call, context, { approved });
+      const approved = await this.approval.approve(invocation);
+      await this.emit("tool.approval.completed", call, context, {
+        approved,
+        evidenceDigest: invocation.evidenceDigest,
+      }, invocation);
       if (!approved) {
         const result = failure("approval_denied", "Tool execution was not approved");
-        await this.emit("tool.execution.failed", call, context, result.error);
+        await this.emit("tool.execution.failed", call, context, result.error, invocation);
         return result;
       }
     }
@@ -155,10 +173,13 @@ export class ToolRuntime {
     await this.emit("tool.execution.started", call, context, {
       risk: tool.risk,
       effect: tool.effect,
-    });
+      evidenceDigest: invocation.evidenceDigest,
+    }, invocation);
 
     try {
-      const execution = Promise.resolve(tool.execute(input, context));
+      const execution = Promise.resolve(
+        tool.execute(invocation.input, executionContext(invocation, context.signal)),
+      );
       const value = tool.timeoutMs
         ? await withTimeout(execution, tool.timeoutMs)
         : await execution;
@@ -167,11 +188,12 @@ export class ToolRuntime {
       await this.emit("tool.execution.succeeded", call, context, {
         risk: tool.risk,
         effect: tool.effect,
-      });
+        evidenceDigest: invocation.evidenceDigest,
+      }, invocation);
       return result;
     } catch (error) {
       const result = failure("execution_failed", messageOf(error));
-      await this.emit("tool.execution.failed", call, context, result.error);
+      await this.emit("tool.execution.failed", call, context, result.error, invocation);
       return result;
     }
   }
@@ -181,6 +203,7 @@ export class ToolRuntime {
     call: ToolCall,
     context: ToolExecutionContext,
     data?: unknown,
+    invocation?: ToolInvocationEnvelope,
   ): Promise<void> {
     if (!this.onEvent) return;
     try {
@@ -189,10 +212,15 @@ export class ToolRuntime {
         time: this.now(),
         callId: call.id,
         toolName: call.name,
-        sessionId: context.sessionId,
-        transactionId: context.transactionId,
-        correlationId: metadataString(context.metadata, "correlationId"),
-        actorId: context.actorId,
+        sessionId: invocation?.context.sessionId ?? context.sessionId,
+        transactionId: invocation?.context.transactionId ?? context.transactionId,
+        correlationId:
+          metadataString(invocation?.context.metadata, "correlationId") ??
+          metadataString(context.metadata, "correlationId"),
+        actorId: invocation?.context.actorId ?? context.actorId,
+        evidenceDigest: invocation?.evidenceDigest,
+        target: invocation?.target,
+        artifactRefs: invocation?.artifactRefs,
         data,
       });
     } catch {
@@ -200,6 +228,19 @@ export class ToolRuntime {
       // can impose fail-closed persistence at the Harness/commit boundary.
     }
   }
+}
+
+function executionContext(
+  invocation: ToolInvocationEnvelope,
+  signal: AbortSignal | undefined,
+): ToolExecutionContext {
+  return {
+    sessionId: invocation.context.sessionId,
+    transactionId: invocation.context.transactionId,
+    actorId: invocation.context.actorId,
+    signal,
+    metadata: invocation.context.metadata,
+  };
 }
 
 function metadataString(
