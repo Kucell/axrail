@@ -40,6 +40,7 @@ export interface ApprovalRequest {
   readonly requiredApprovers?: readonly ApprovalRequirement[];
   readonly expiresAt?: string;
   readonly evidence?: ApprovalEvidence;
+  readonly evidenceDigest?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
