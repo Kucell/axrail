@@ -4,6 +4,11 @@ export function canonicalizeChangeSet(changeSet: ChangeSet): string {
   return canonicalJson(changeSet);
 }
 
+export function snapshotChangeSet(changeSet: ChangeSet): ChangeSet {
+  const cloned = JSON.parse(canonicalizeChangeSet(changeSet)) as ChangeSet;
+  return deepFreeze(cloned);
+}
+
 export async function digestChangeSet(changeSet: ChangeSet): Promise<string> {
   const cryptoApi = globalThis.crypto;
   if (!cryptoApi?.subtle) {
@@ -60,6 +65,12 @@ function normalize(value: unknown): unknown {
   }
 
   throw new TypeError(`Unsupported value in canonical JSON: ${typeof value}`);
+}
+
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  return Object.freeze(value);
 }
 
 function toHex(bytes: Uint8Array): string {
