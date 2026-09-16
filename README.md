@@ -32,18 +32,53 @@ The goal is not `model → tool → execute`. Important engineering changes beco
 The current v0.1 foundation includes:
 
 - **`@axrail/core`** — capability registry, plugin lifecycle, scopes, event bus, runtime shell.
+- **`@axrail/harness`** — high-level composition root that binds adapters, tools, policy, approval, events, sessions, agents, and transactions into an embeddable Harness runtime.
 - **`@axrail/tools`** — governed tool registry/execution, L0-L5 risk metadata, policy and approval hooks, fail-closed privileged execution.
 - **`@axrail/artifacts`** — portable engineering artifact identity, versions, snapshots, providers.
-- **`@axrail/changesets`** — structured engineering changes, operations, preconditions, risk metadata.
+- **`@axrail/changesets`** — structured engineering changes, operations, preconditions, risk metadata, and canonical digests.
 - **`@axrail/validation`** — composable schema, semantic, domain, adapter, safety and post-execution validation stages.
 - **`@axrail/policy`** — deny-overrides policy composition with default-deny behavior.
-- **`@axrail/approval`** — approval requests, decisions, expiration and fail-closed provider behavior.
+- **`@axrail/approval`** — approval requests, decisions, expiration, evidence binding, and fail-closed provider behavior.
 - **`@axrail/transactions`** — transaction state machine, optimistic concurrency, atomic/compensating/best-effort executors, validation/policy/approval bridges and explicit rollback.
+- **`@axrail/events`** — observable runtime event envelopes, EventStore contracts, session lifecycle, correlation, and replay.
 - **`@axrail/adapter-sdk`** — vendor-neutral adapter lifecycle and capability manifests (`exact`, `compatible`, `degraded`, `unsupported`).
 - **`@axrail/mcp`** — MCP tools bridged into the Axrail Tool Runtime instead of bypassing governance.
-- **`@axrail/agent`** — model-agnostic agent loop with append-only session history and sequential governed tool execution.
+- **`@axrail/agent`** — model-agnostic in-process agent loop with append-only session history and sequential governed tool execution.
 
 APIs are still draft and may change before v1.0.
+
+## Axrail Agent runtime workspace
+
+The separate [`Kucell/axrail-agent`](https://github.com/Kucell/axrail-agent) project is the durable **agent task-management and execution-journal layer** for Axrail.
+
+It is intentionally different from the `@axrail/agent` package in this repository:
+
+```text
+@axrail/agent
+  = in-process AgentLoop + model/tool orchestration
+
+Kucell/axrail-agent
+  = durable task state + plans + activities + decisions
+    + handoffs + waitpoints + memory + execution references
+```
+
+The responsibility split is:
+
+```text
+AI / Agent
+    ↓
+axrail-agent
+Task / Plan / Activity / Decision / Handoff
+    ↓
+Axrail Harness
+Tool / Policy / Approval / Transaction / EventStore
+    ↓
+Industrial & Engineering Systems
+```
+
+Axrail EventStore remains authoritative for governed execution facts such as tool calls, policy decisions, approvals, transactions, commits, and rollbacks. `axrail-agent` records the durable work context around those facts and correlates them through stable IDs such as `session_id`, `task_id`, `correlation_id`, `transaction_id`, and `changeset_id`.
+
+The two systems should **reference and correlate rather than duplicate** the full raw event stream.
 
 ## HMI reference flow
 
@@ -132,7 +167,7 @@ pnpm test
 
 ## Current priorities
 
-The remaining v0.1 work is focused on behavioral tests, event/session persistence, model-provider adapters, an official MCP SDK transport integration, and stronger reference adapters/examples.
+The next phase focuses on durable EventStore providers, approval freshness hardening, stronger adapter kits, and formalizing the integration boundary with `axrail-agent`.
 
 ## License
 
