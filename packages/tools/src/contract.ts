@@ -40,6 +40,7 @@ export interface ToolInvocationContextSnapshot {
 export interface ToolInvocationEnvelope<TInput = unknown> {
   readonly callId: string;
   readonly toolName: string;
+  readonly toolDescription: string;
   readonly toolVersion?: string;
   readonly providerId?: string;
   readonly risk: ToolRiskLevel;
