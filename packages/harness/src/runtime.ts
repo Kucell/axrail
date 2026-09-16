@@ -24,6 +24,7 @@ import {
   type ToolPolicyDecision,
   type ToolPolicyEvaluator,
 } from "@axrail/tools";
+import { HarnessAgent, type HarnessAgentOptions } from "./agent.js";
 
 export interface HarnessRuntimeOptions {
   readonly adapterHost?: AdapterHost;
@@ -65,6 +66,10 @@ export class HarnessRuntime {
       policy: new HarnessToolPolicy(this),
       approval: this.approval ? new HarnessToolApproval(this) : undefined,
     });
+  }
+
+  createAgent(options: HarnessAgentOptions): HarnessAgent {
+    return new HarnessAgent(this, options);
   }
 
   mountAdapter(
