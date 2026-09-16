@@ -169,3 +169,135 @@ test("AgentLoop can explicitly continue later same-turn Tools after a failure", 
   await agent.run("continue mode");
   assert.equal(secondExecuted, true);
 });
+
+test("AgentLoop ignores observational event failures by default after Tool success", async () => {
+  let toolExecuted = false;
+  const tools = new ToolRuntime();
+  tools.registry.register({
+    name: "read.status",
+    description: "Read status",
+    risk: "L0",
+    effect: "read",
+    execute() {
+      toolExecuted = true;
+      return { ready: true };
+    },
+  });
+
+  let modelCalls = 0;
+  const agent = new AgentLoop({
+    tools,
+    onEvent(event) {
+      if (event.type === "agent.tool.completed") {
+        throw new Error("telemetry sink unavailable");
+      }
+    },
+    model: {
+      id: "observer-failure-model",
+      async complete() {
+        modelCalls += 1;
+        return modelCalls === 1
+          ? {
+              toolCalls: [{ id: "read-1", name: "read.status", input: {} }],
+              stopReason: "tool_calls",
+            }
+          : { content: "completed despite telemetry failure", stopReason: "completed" };
+      },
+    },
+  });
+
+  const result = await agent.run("read status");
+  assert.equal(toolExecuted, true);
+  assert.equal(result.status, "completed");
+  assert.equal(result.content, "completed despite telemetry failure");
+});
+
+test("AgentLoop can explicitly propagate authoritative event failures", async () => {
+  const agent = new AgentLoop({
+    tools: new ToolRuntime(),
+    eventFailureMode: "propagate",
+    onEvent() {
+      throw new Error("authoritative event persistence failed");
+    },
+    model: {
+      id: "not-reached",
+      async complete() {
+        return { content: "unexpected", stopReason: "completed" };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => agent.run("fail on event persistence"),
+    /authoritative event persistence failed/,
+  );
+});
+
+test("read Tool result validation failure is a distinct postcondition error", async () => {
+  const tools = new ToolRuntime();
+  tools.registry.register({
+    name: "read.invalid-result",
+    description: "Read then reject result shape",
+    risk: "L0",
+    effect: "read",
+    execute() {
+      return { unexpected: true };
+    },
+    validateResult() {
+      throw new Error("result schema mismatch");
+    },
+  });
+
+  const result = await tools.execute({
+    id: "read-invalid",
+    name: "read.invalid-result",
+    input: {},
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error?.code, "result_validation_failed");
+  assert.deepEqual(result.error?.details, {
+    phase: "result_validation",
+    effectUncertain: false,
+    retrySafe: true,
+  });
+});
+
+test("side-effecting Tool result validation failure reports execution uncertainty", async () => {
+  let effectApplied = false;
+  const tools = new ToolRuntime({
+    policy: {
+      evaluate() {
+        return { allow: true };
+      },
+    },
+  });
+  tools.registry.register({
+    name: "engineering.invalid-result",
+    description: "Write then reject returned result",
+    risk: "L2",
+    effect: "engineering-write",
+    execute() {
+      effectApplied = true;
+      return { malformed: true };
+    },
+    validateResult() {
+      throw new Error("postcondition failed");
+    },
+  });
+
+  const result = await tools.execute({
+    id: "write-invalid",
+    name: "engineering.invalid-result",
+    input: {},
+  });
+
+  assert.equal(effectApplied, true);
+  assert.equal(result.ok, false);
+  assert.equal(result.error?.code, "execution_uncertain");
+  assert.deepEqual(result.error?.details, {
+    phase: "result_validation",
+    effectUncertain: true,
+    retrySafe: false,
+  });
+});
