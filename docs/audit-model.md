@@ -79,7 +79,7 @@ required_before_commit
 - observer persistence failures do not block Tool execution or Transaction progress;
 - no authoritative audit checkpoint is required.
 
-This is the default development/embedded profile.
+This is the default development/embedded profile. The default is a usability choice, **not** a recommendation that production or safety-sensitive systems should rely on best-effort audit.
 
 ### `required_before_effect`
 
@@ -90,6 +90,17 @@ Before a Tool executes or a Transaction enters `apply()`, Axrail must persist an
 This includes the `required_before_effect` guarantee and additionally requires `audit.commit.checkpoint` before Transaction commit. A failed commit checkpoint prevents `executor.commit()` from running.
 
 For compensating or best-effort transactions, the effect checkpoint is still required before `apply()` because `apply()` itself may already touch an external system.
+
+## Production guidance
+
+Select audit behavior explicitly according to the application boundary:
+
+- local experimentation, tests, and disposable design tooling may choose `best_effort`;
+- engineering write/deployment environments that require evidence before any external mutation should use at least `required_before_effect`;
+- workflows where commit is a separately governed irreversible boundary should use `required_before_commit`;
+- physical-action, safety-sensitive, regulated, or compliance-dependent deployments should combine a strict profile with an EventStore whose durability and operational guarantees meet the application requirements.
+
+A strict Axrail profile only governs software-side audit persistence. It does not replace safety PLCs, interlocks, emergency stops, SIL/PL-rated controls, regulated procedures, or target-system transactional guarantees.
 
 ## Why ordinary events stay observational
 
