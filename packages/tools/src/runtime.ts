@@ -414,8 +414,11 @@ async function withTimeout<T>(
       promise,
       new Promise<T>((_, reject) => {
         timer = setTimeout(() => {
-          controller.abort(timeoutError);
+          // Settle the timeout branch before dispatching AbortSignal listeners.
+          // A cooperative Tool may resolve/reject synchronously from its abort
+          // handler; the timeout classification must remain authoritative.
           reject(timeoutError);
+          controller.abort(timeoutError);
         }, timeoutMs);
       }),
     ]);
