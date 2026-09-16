@@ -21,6 +21,7 @@ export function createTransactionPolicyEvaluator(
             ? "require_approval"
             : decision.effect,
         reason: decision.reason,
+        obligations: decision.obligations,
       };
     },
   };
