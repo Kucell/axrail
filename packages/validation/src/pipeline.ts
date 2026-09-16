@@ -10,6 +10,10 @@ export interface ValidationPipelineOptions {
   readonly failFast?: boolean;
 }
 
+export interface ValidationListOptions {
+  readonly providerIds?: readonly string[];
+}
+
 export class ValidationPipeline<T = unknown> {
   private readonly validators = new Map<string, Validator<T>>();
   private readonly failFast: boolean;
@@ -18,18 +22,27 @@ export class ValidationPipeline<T = unknown> {
     this.failFast = options.failFast ?? false;
   }
 
-  register(validator: Validator<T>): void {
+  register(validator: Validator<T>): () => void {
     if (!validator.id) throw new Error("Validator id must not be empty");
-    if (this.validators.has(validator.id)) throw new Error(`Validator already registered: ${validator.id}`);
-    this.validators.set(validator.id, validator);
+    const key = validatorKey(validator.id, validator.providerId);
+    if (this.validators.has(key)) {
+      throw new Error(
+        `Validator already registered: ${validator.id}${validator.providerId ? ` (${validator.providerId})` : ""}`,
+      );
+    }
+    this.validators.set(key, validator);
+    return () => {
+      if (this.validators.get(key) === validator) this.validators.delete(key);
+    };
   }
 
-  unregister(id: string): boolean {
-    return this.validators.delete(id);
+  unregister(id: string, providerId?: string): boolean {
+    return this.validators.delete(validatorKey(id, providerId));
   }
 
-  list(): readonly Validator<T>[] {
-    return [...this.validators.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  list(options: ValidationListOptions = {}): readonly Validator<T>[] {
+    const selected = this.selectByProvider(options.providerIds);
+    return selected.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
 
   async validate(
@@ -40,7 +53,7 @@ export class ValidationPipeline<T = unknown> {
     const issues: ValidationIssue[] = [];
     const validatorsRun: string[] = [];
 
-    for (const validator of this.list()) {
+    for (const validator of this.list({ providerIds: context.providerIds })) {
       if (context.signal?.aborted) {
         issues.push({ code: "validation_cancelled", message: "Validation was cancelled", severity: "error", source: validator.id });
         break;
@@ -49,7 +62,7 @@ export class ValidationPipeline<T = unknown> {
       if (context.stage && validator.stage && validator.stage !== context.stage) continue;
       if (validator.supports && !validator.supports(value, context)) continue;
 
-      validatorsRun.push(validator.id);
+      validatorsRun.push(validator.providerId ? `${validator.providerId}:${validator.id}` : validator.id);
       try {
         const result = await validator.validate(value, context);
         issues.push(...result.map((issue) => issue.source ? issue : { ...issue, source: validator.id }));
@@ -71,4 +84,22 @@ export class ValidationPipeline<T = unknown> {
       validatorsRun,
     };
   }
+
+  private selectByProvider(providerIds: readonly string[] | undefined): Validator<T>[] {
+    const all = [...this.validators.values()];
+    if (!providerIds?.length) {
+      // Without an explicit provider scope, only global validators are safe to
+      // run automatically. Adapter-bound validation requires a resolved target.
+      return all.filter((validator) => !validator.providerId);
+    }
+
+    const active = new Set(providerIds);
+    return all.filter(
+      (validator) => !validator.providerId || active.has(validator.providerId),
+    );
+  }
+}
+
+function validatorKey(id: string, providerId: string | undefined): string {
+  return providerId ? `${providerId}\u0000${id}` : `\u0000${id}`;
 }
