@@ -83,6 +83,7 @@ test("side-effecting Tool timeout aborts execution scope and reports uncertain o
   assert.equal(result.ok, false);
   assert.equal(result.error?.code, "execution_uncertain");
   assert.deepEqual(result.error?.details, {
+    phase: "execution",
     timeoutMs: 10,
     abortRequested: true,
     effectUncertain: true,
