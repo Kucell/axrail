@@ -1,28 +1,36 @@
 import { ApprovalService, isApprovalGranted, type ApprovalRequirement } from "@axrail/approval";
 import { digestChangeSet, highestDeclaredRisk, type ChangeSet } from "@axrail/changesets";
-import { PolicyEngine, type PolicyInput } from "@axrail/policy";
+import {
+  PolicyEngine,
+  type PolicyDecision,
+  type PolicyInput,
+  type PolicyObligation,
+} from "@axrail/policy";
 import { ValidationPipeline } from "@axrail/validation";
 import type {
   TransactionApprovalProvider,
+  TransactionPolicyDecision,
   TransactionPolicyEvaluator,
   TransactionRecord,
 } from "./types.js";
 
+export type TransactionPolicyInputMapper = (
+  transaction: TransactionRecord,
+) => PolicyInput | readonly PolicyInput[];
+
 export function createTransactionPolicyEvaluator(
   engine: PolicyEngine,
-  mapInput: (transaction: TransactionRecord) => PolicyInput = defaultPolicyInput,
+  mapInput: TransactionPolicyInputMapper = defaultPolicyInputs,
 ): TransactionPolicyEvaluator {
   return {
     async evaluate(transaction) {
-      const decision = await engine.evaluate(mapInput(transaction));
-      return {
-        effect:
-          decision.effect === "require-approval"
-            ? "require_approval"
-            : decision.effect,
-        reason: decision.reason,
-        obligations: decision.obligations,
-      };
+      const mapped = mapInput(transaction);
+      const inputs = Array.isArray(mapped) ? mapped : [mapped];
+      const decisions: PolicyDecision[] = [];
+      for (const input of inputs) {
+        decisions.push(await engine.evaluate(input));
+      }
+      return mergeTransactionPolicyDecisions(decisions);
     },
   };
 }
@@ -106,6 +114,13 @@ export function createTransactionValidator(
     });
 }
 
+function defaultPolicyInputs(transaction: TransactionRecord): readonly PolicyInput[] {
+  const base = defaultPolicyInput(transaction);
+  const adapterIds = [...new Set(transaction.context.adapterIds ?? [])];
+  if (adapterIds.length === 0) return [base];
+  return adapterIds.map((adapterId) => ({ ...base, adapterId }));
+}
+
 function defaultPolicyInput(transaction: TransactionRecord): PolicyInput {
   const artifact = transaction.changeSet.artifacts.length === 1
     ? transaction.changeSet.artifacts[0]
@@ -122,7 +137,6 @@ function defaultPolicyInput(transaction: TransactionRecord): PolicyInput {
     risk: highestDeclaredRisk(transaction.changeSet),
     environment: transaction.context.environment,
     transactionMode: transaction.mode,
-    adapterId: transaction.context.adapterIds?.[0],
     resource: artifact
       ? {
           id: artifact.id,
@@ -135,6 +149,42 @@ function defaultPolicyInput(transaction: TransactionRecord): PolicyInput {
       changeSetId: transaction.changeSet.id,
       operationCount: transaction.changeSet.operations.length,
       artifactCount: transaction.changeSet.artifacts.length,
+      adapterIds: transaction.context.adapterIds,
     },
   };
+}
+
+function mergeTransactionPolicyDecisions(
+  decisions: readonly PolicyDecision[],
+): TransactionPolicyDecision {
+  const deny = decisions.find((decision) => decision.effect === "deny");
+  const requiresApproval = decisions.some(
+    (decision) => decision.effect === "require-approval",
+  );
+  const effect: TransactionPolicyDecision["effect"] = deny
+    ? "deny"
+    : requiresApproval
+      ? "require_approval"
+      : "allow";
+
+  const reason = deny?.reason ?? decisions.find((decision) => decision.reason)?.reason;
+  const obligations = dedupeObligations(
+    decisions.flatMap((decision) => decision.obligations ?? []),
+  );
+
+  return {
+    effect,
+    reason,
+    obligations,
+  };
+}
+
+function dedupeObligations(
+  obligations: readonly PolicyObligation[],
+): readonly PolicyObligation[] {
+  const unique = new Map<string, PolicyObligation>();
+  for (const obligation of obligations) {
+    unique.set(JSON.stringify(obligation), obligation);
+  }
+  return [...unique.values()];
 }
