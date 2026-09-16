@@ -1,4 +1,4 @@
-import type { ChangeSet } from "./contract.js";
+import type { ChangeSet } from "./model.js";
 
 export function canonicalizeChangeSet(changeSet: ChangeSet): string {
   return canonicalJson(changeSet);
