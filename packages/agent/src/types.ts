@@ -5,6 +5,8 @@ export type AgentMessageRole = "system" | "user" | "assistant" | "tool";
 export interface AgentToolCall {
   readonly id: string;
   readonly name: string;
+  /** Optional explicit provider for deterministic/custom model providers. */
+  readonly providerId?: string;
   readonly input: unknown;
 }
 
@@ -47,6 +49,8 @@ export interface AgentModelProvider {
 export interface AgentRunContext {
   readonly actorId?: string;
   readonly transactionId?: string;
+  /** Active Adapter/Tool providers for semantic Tool resolution. */
+  readonly providerIds?: readonly string[];
   readonly signal?: AbortSignal;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
