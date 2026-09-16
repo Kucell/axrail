@@ -128,6 +128,7 @@ export class HarnessRuntime {
       validate: (changeSet, transaction) =>
         this.adapters.validation.validate(changeSet, {
           environment: transaction.context.environment ?? this.environment,
+          providerIds: transaction.context.adapterIds,
           signal: transaction.context.signal,
           metadata: {
             transactionId: transaction.id,
