@@ -11,9 +11,9 @@ test("hello-agent demonstrates read and approved engineering-write paths", async
   assert.match(result.content ?? "", /governed rename/);
 
   assert.ok(result.eventTypes.includes("tool.execution.requested"));
-  assert.ok(result.eventTypes.includes("tool.policy.evaluated"));
-  assert.ok(result.eventTypes.includes("tool.approval.requested"));
-  assert.ok(result.eventTypes.includes("tool.approval.completed"));
+  assert.ok(result.eventTypes.includes("policy.evaluation.completed"));
+  assert.ok(result.eventTypes.includes("approval.requested"));
+  assert.ok(result.eventTypes.includes("approval.approved"));
   assert.ok(result.eventTypes.includes("tool.execution.succeeded"));
   assert.ok(result.eventTypes.includes("session.completed"));
 });
