@@ -1,0 +1,103 @@
+name: Stage npm Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Lockstep version to stage
+        required: true
+        default: 0.1.0-rc.1
+        type: string
+      dist_tag:
+        description: npm dist-tag
+        required: true
+        default: rc
+        type: choice
+        options:
+          - rc
+          - next
+          - latest
+      confirm:
+        description: Type STAGE-RELEASE to continue
+        required: true
+        type: string
+
+concurrency:
+  group: axrail-npm-stage
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Verify explicit confirmation and version
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          test "$CONFIRM" = "STAGE-RELEASE"
+          node --input-type=module <<'EOF'
+          import { readFile } from 'node:fs/promises';
+          const root = JSON.parse(await readFile('package.json', 'utf8'));
+          if (root.version !== process.env.EXPECTED_VERSION) {
+            throw new Error(`Requested ${process.env.EXPECTED_VERSION}, repository is ${root.version}`);
+          }
+          EOF
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - name: Pack and verify exact stage artifacts
+        env:
+          AXRAIL_ARTIFACT_DIR: artifacts/rc-packages
+        run: pnpm pack:smoke
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: axrail-stage-${{ inputs.version }}
+          path: artifacts/rc-packages/*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  stage:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: axrail-stage-${{ inputs.version }}
+          path: artifacts/rc-packages
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Verify npm supports trusted staged publishing
+        run: |
+          node --version
+          npm --version
+          node -e 'const [major,minor]=process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 14)) process.exit(1)'
+      - name: Stage verified tarballs using npm OIDC trusted publishing
+        env:
+          VERSION: ${{ inputs.version }}
+          DIST_TAG: ${{ inputs.dist_tag }}
+        run: |
+          set -euo pipefail
+          packages=(approval artifacts events policy tools validation changesets agent mcp model-openai-compatible cli transactions adapter-sdk hmi-adapter-kit harness)
+          for package in "${packages[@]}"; do
+            tarball="artifacts/rc-packages/axrail-${package}-${VERSION}.tgz"
+            test -f "$tarball"
+            npm stage publish "$tarball" --access public --tag "$DIST_TAG" --provenance
+          done
+          echo "Packages are staged, not public. Review and approve each staged package on npmjs.com with 2FA before finalizing the GitHub Release."
