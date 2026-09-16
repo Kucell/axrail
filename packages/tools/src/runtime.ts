@@ -8,6 +8,7 @@ import { ToolRegistry } from "./registry.js";
 
 export interface ToolPolicyDecision {
   readonly allow: boolean;
+  readonly code?: "policy_unavailable" | "policy_denied";
   readonly reason?: string;
   readonly requireApproval?: boolean;
 }
@@ -74,12 +75,15 @@ export class ToolRuntime {
       );
     }
 
-    const decision = this.policy
+    const decision: ToolPolicyDecision = this.policy
       ? await this.policy.evaluate(tool, call, context)
       : { allow: true };
 
     if (!decision.allow) {
-      return failure("policy_denied", decision.reason ?? "Tool execution denied by policy");
+      return failure(
+        decision.code ?? "policy_denied",
+        decision.reason ?? "Tool execution denied by policy",
+      );
     }
 
     if (decision.requireApproval) {
