@@ -59,7 +59,7 @@ export class AgentLoop {
       await this.emit(session.id, "agent.step.started", step);
       const response = await this.model.complete({
         messages: session.messages(),
-        tools: this.modelTools(),
+        tools: this.modelTools(context),
         signal: context.signal,
         metadata: context.metadata,
       });
@@ -86,7 +86,12 @@ export class AgentLoop {
       // simpler than parallel execution of arbitrary tool calls.
       for (const call of response.toolCalls) {
         const toolResult = await this.tools.execute(
-          { id: call.id, name: call.name, input: call.input },
+          {
+            id: call.id,
+            name: call.name,
+            providerId: call.providerId,
+            input: call.input,
+          },
           this.toolContext(session.id, context),
         );
         session.append({
@@ -98,6 +103,7 @@ export class AgentLoop {
         await this.emit(session.id, "agent.tool.completed", step, {
           toolCallId: call.id,
           tool: call.name,
+          providerId: call.providerId,
           ok: toolResult.ok,
           errorCode: toolResult.error?.code,
         });
@@ -108,8 +114,8 @@ export class AgentLoop {
     return this.result("max_steps", session, this.maxSteps);
   }
 
-  private modelTools(): readonly AgentModelTool[] {
-    return this.tools.registry.list().map((tool) => ({
+  private modelTools(context: AgentRunContext): readonly AgentModelTool[] {
+    return this.tools.registry.list({ providerIds: context.providerIds }).map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
@@ -123,6 +129,7 @@ export class AgentLoop {
       sessionId,
       transactionId: context.transactionId,
       actorId: context.actorId,
+      providerIds: context.providerIds,
       signal: context.signal,
       metadata: context.metadata,
     };
