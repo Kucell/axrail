@@ -144,6 +144,8 @@ Multiple HMI/engineering Adapters may expose the same semantic Tool name. Axrail
 
 A commercial HMI, PLC IDE, robot platform, MES, CAD/CAE tool or digital-twin environment can replace the mock boundary through an Axrail Adapter.
 
+For a real AI-native HMI/configuration product handoff, see the [AI-native HMI Integration Guide](docs/integrations/ai-native-hmi/README.md) and its [integration feedback template](docs/integrations/ai-native-hmi/feedback-template.md). The guide targets post-RC `main` and explicitly distinguishes the provider-bound high-level mutation API from the already published `0.1.0-rc.1` artifact.
+
 ## MCP boundary
 
 MCP is treated as an interoperability layer, not Axrail's internal object model.
@@ -188,6 +190,8 @@ Physical and safety-critical actions must remain constrained by deterministic co
 
 - [Architecture overview](docs/architecture/README.md)
 - [Architecture and design](docs/architecture/design.md)
+- [AI-native HMI Integration Guide](docs/integrations/ai-native-hmi/README.md)
+- [HMI Integration Feedback Template](docs/integrations/ai-native-hmi/feedback-template.md)
 - [Execution boundary semantics](docs/execution-semantics.md)
 - [Audit model](docs/audit-model.md)
 - [Release hardening](docs/release/README.md)
