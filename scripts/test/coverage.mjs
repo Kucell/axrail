@@ -29,6 +29,17 @@ const args = [
   // bin.ts is a side-effect process bootstrap. CLI behavior is covered through
   // the importable runCli surface in packages/cli/src/index.ts.
   "--test-coverage-exclude=packages/cli/src/bin.ts",
+  // These files contain TypeScript-only interfaces/type aliases with no
+  // executable runtime behavior. They remain strictly checked by `pnpm check`
+  // and package declaration smoke tests, but V8 runtime branch coverage is not
+  // meaningful for erased compile-time declarations.
+  "--test-coverage-exclude=packages/adapter-sdk/src/types.ts",
+  "--test-coverage-exclude=packages/agent/src/types.ts",
+  "--test-coverage-exclude=packages/approval/src/types.ts",
+  "--test-coverage-exclude=packages/events/src/types.ts",
+  "--test-coverage-exclude=packages/mcp/src/types.ts",
+  "--test-coverage-exclude=packages/policy/src/types.ts",
+  "--test-coverage-exclude=packages/tools/src/contract.ts",
   "--test-coverage-lines=95",
   "--test-coverage-functions=95",
   "--test-coverage-branches=95",
