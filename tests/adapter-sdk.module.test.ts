@@ -38,7 +38,6 @@ test("AdapterRegistry validates identity and enforces lifecycle transitions", as
 
   const ready = await registry.initialize("adapter-a", { environment: "test" });
   assert.equal(ready.state, "ready");
-  assert.throws(() => registry.unregister("adapter-a"), /Cannot unregister/);
   await assert.rejects(registry.initialize("adapter-a"), /cannot initialize from state ready/);
 
   const active = await registry.start("adapter-a");

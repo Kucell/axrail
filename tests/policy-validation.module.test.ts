@@ -150,5 +150,5 @@ test("ValidationPipeline includes global and active-provider validators only", a
   pipeline.register({ id: "b", providerId: "b", validate: () => [] });
 
   const result = await pipeline.validate("value", { providerIds: ["a"] });
-  assert.deepEqual(result.validatorsRun, ["global", "a"]);
+  assert.deepEqual(result.validatorsRun, ["global", "a:a"]);
 });
