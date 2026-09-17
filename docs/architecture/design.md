@@ -734,7 +734,7 @@ RFC-0004 — Capability & Plugin Model
   revise to reflect Harness/AdapterHost reality
 
 RFC-0006 — Adapter Protocol
-  stabilize real integration and transaction semantics
+  review executor selection, transaction participation and preview semantics from real integrations before any public stabilization
 
 RFC-0002 — ChangeSet Protocol
 RFC-0003 — Transaction Runtime
