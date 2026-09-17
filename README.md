@@ -53,7 +53,7 @@ The implemented v0.1 foundation includes:
 - **`@axrail/hmi-adapter-kit`** — optional vendor-neutral HMI domain SDK built above `@axrail/adapter-sdk`; it is not a Harness/kernel dependency.
 - **`@axrail/cli`** — read-only diagnostic CLI for EventStore inspection and ChangeSet evidence digests.
 
-`@axrail/core` remains in the monorepo as **experimental capability/plugin kernel research**. It is private and not part of the supported v0.1 public package set because RFC-0004 capability/plugin semantics have not yet been fully converged with the working `@axrail/harness` / AdapterHost composition model.
+`@axrail/core` remains in the monorepo as **experimental capability/plugin kernel research**. It is private and not part of the supported v0.1 public package set. The supported composition model is `@axrail/harness` + `AdapterHost`; RFC-0004 is exploratory rather than a requirement to introduce a second runtime kernel.
 
 ## Release candidate status
 
@@ -201,6 +201,7 @@ Physical and safety-critical actions must remain constrained by deterministic co
 - [RFC-0006: Adapter Protocol](rfcs/0006-adapter-protocol/README.md)
 - [RFC-0007: Policy & Approval Model](rfcs/0007-policy-approval-model/README.md)
 - [RFC-0008: Event & Session Model](rfcs/0008-event-session-model/README.md)
+- [RFC-0009: Transactional Mutation Pipeline](rfcs/0009-transactional-mutation/README.md)
 
 ## Workspace
 
@@ -235,13 +236,23 @@ The v0.1 CLI is intentionally read-only/diagnostic; it does not provide a privil
 
 ## Current priorities
 
-The functional scope, architecture gates, public API surface, package build, clean-consumer RC verification, post-RC hardening, and first npm bootstrap publication are complete.
+The v0.1 runtime/release foundation and first npm bootstrap publication are complete. Current engineering priority is now:
 
-Remaining RC1 closeout is intentionally limited to:
+```text
+Architecture Convergence
+  ↓
+Transactional Mutation
+  ↓
+Real HMI Adapter validation
+  ↓
+Engineering Runtime
+  ↓
+Second Adapter validation
+  ↓
+v0.2 stabilization
+```
 
-- removing the one-time bootstrap npm credential;
-- configuring stage-only Trusted Publishers for subsequent releases;
-- finalizing the exact `v0.1.0-rc.1` Git tag and GitHub prerelease after registry verification.
+RC1 operational closeout continues in parallel: configure stage-only Trusted Publishers and finalize the exact `v0.1.0-rc.1` GitHub tag/prerelease from provenance commit `e4758656c20f6cb90b05eb3429c79010667a2f7d`. The one-time bootstrap npm credential is temporarily retained by maintainer decision and is not the intended mechanism for subsequent releases.
 
 ## License
 
