@@ -1,53 +1,90 @@
 # Architecture
 
-Axrail separates agent intent from governed execution. Core artifacts are portable data; adapters perform application-specific work; transactions coordinate policy, validation, approval, and commit.
+Axrail separates Agent intent from governed execution. Durable engineering changes should converge on explicit ChangeSet + Transaction semantics, while Adapters provide vendor/domain-specific execution boundaries.
 
 ## Documents
 
-- [Architecture and Design](design.md) — project positioning, execution model, first-class concepts, module boundaries, tool runtime, risk model, adapters, MCP integration, HMI reference-domain boundary, roadmap, and RFC sequence.
+- [Architecture and Design](design.md) — current implemented composition model, execution boundaries, package architecture, Adapter/MCP/HMI boundaries, Transactional Mutation direction, and updated roadmap.
+- [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — convergence path from governed Tool intent to ChangeSet + Transaction execution.
 
-## Core model
+## Current runtime model
 
 ```text
-Intent
-  ↓
-ChangeSet
-  ↓
-Transaction
-  ↓
-Policy
-  ↓
-Validation
-  ↓
-Approval
-  ↓
-Commit
+HarnessRuntime
+    │
+    ├── Agent
+    ├── ToolRuntime
+    ├── AdapterHost
+    ├── TransactionRuntime
+    ├── EventStore / Sessions
+    ├── Policy
+    ├── Validation
+    └── Approval
 ```
+
+`HarnessRuntime` + `AdapterHost` is the supported composition model.
+
+`@axrail/core` remains private/experimental capability/plugin research and is not the supported runtime kernel.
+
+## Governed execution model
+
+```text
+Agent / Human Intent
+        ↓
+Governed Tool / Change Proposal
+        ↓
+ChangeSet
+        ↓
+Transaction
+   ├─ Policy
+   ├─ Validation
+   ├─ Approval
+   └─ Audit
+        ↓
+Adapter / MCP
+        ↓
+Controlled Effect
+        ↓
+Commit / Rollback / Explicit Uncertainty
+```
+
+For durable L2/L3 engineering mutations, the roadmap direction is to make ChangeSet + Transaction the normal execution path rather than allow direct Tool effects to become a parallel privileged mutation architecture.
 
 ## RFCs
 
 1. [RFC-0001 Artifact Model](../../rfcs/0001-artifact-model/README.md)
 2. [RFC-0002 ChangeSet Protocol](../../rfcs/0002-changeset-protocol/README.md)
 3. [RFC-0003 Transaction Runtime](../../rfcs/0003-transaction-runtime/README.md)
-4. [RFC-0004 Capability & Plugin Model](../../rfcs/0004-capability-plugin-model/README.md)
+4. [RFC-0004 Capability & Plugin Model](../../rfcs/0004-capability-plugin-model/README.md) — exploratory; generic kernel is not on the supported runtime path.
 5. [RFC-0005 Tool Runtime & Risk Model](../../rfcs/0005-tool-runtime-risk-model/README.md)
-6. [RFC-0006 Adapter Protocol](../../rfcs/0006-adapter-protocol/README.md)
+6. [RFC-0006 Adapter Protocol](../../rfcs/0006-adapter-protocol/README.md) — implemented foundation; advanced transaction semantics under convergence.
 7. [RFC-0007 Policy & Approval Model](../../rfcs/0007-policy-approval-model/README.md)
 8. [RFC-0008 Event & Session Model](../../rfcs/0008-event-session-model/README.md)
+9. [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — current post-RC architecture workstream.
 
-## Implementation workstream
+## Current architecture workstream
 
-The v0.1 protocol skeleton is now complete enough to start implementation with substantially less architectural churn.
+The v0.1 foundation is implemented and published. Architecture work now prioritizes convergence and real integration rather than adding broad speculative infrastructure.
 
-Recommended implementation order:
+Recommended order:
 
-1. `@axrail/core` — capability registry, plugin lifecycle, scopes, events
-2. `@axrail/tools` — tool contracts, registry, risk metadata, controlled execution pipeline
-3. `@axrail/artifacts` and `@axrail/changesets` — portable engineering data contracts
-4. `@axrail/policy`, `@axrail/approval`, `@axrail/validation` — governance pipeline
-5. `@axrail/transactions` — transaction state machine, prepare/commit/rollback
-6. `@axrail/adapter-sdk` — external engineering-system boundary
-7. `@axrail/mcp` — bridge MCP tools into Axrail-native execution
-8. `@axrail/agent` — agent loop built on top of the governed runtime
+1. **Architecture Convergence** — keep Harness/AdapterHost as the real composition model; keep `@axrail/core` experimental; align RFCs and docs.
+2. **Transactional Mutation** — connect governed Tool/change proposals to ChangeSet + Transaction through a high-level Harness path.
+3. **Real HMI Adapter** — validate executor selection, preview, Validation, Policy, Approval, commit/rollback and Context semantics with a real AI-native HMI integration.
+4. **Engineering Runtime** — add Context Assembly, engineering Skills, durable EventStore providers and recovery/resume semantics after the mutation path is proven.
+5. **Second Adapter validation** — use a substantially different engineering integration to ensure the protocol is not HMI-specific.
+6. **v0.2 stabilization** — freeze the next Adapter, transactional mutation, Context and Harness high-level execution contracts.
 
-The implementation should continue to treat HMI as a reference domain rather than a kernel dependency.
+Deferred until the execution protocol matures:
+
+```text
+complex multi-agent orchestration
+cloud control plane
+vector database platform
+GUI studio
+plugin marketplace
+adapter marketplace
+skill marketplace
+```
+
+HMI remains the first reference domain, not a generic Harness dependency.
