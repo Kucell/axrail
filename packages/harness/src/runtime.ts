@@ -11,6 +11,7 @@ import {
   type ApprovalRequirement,
   isApprovalGranted,
 } from "@axrail/approval";
+import type { ChangeSet } from "@axrail/changesets";
 import {
   InMemoryEventStore,
   SessionService,
@@ -30,6 +31,7 @@ import {
   TransactionRuntime,
   createTransactionApprovalProvider,
   createTransactionPolicyEvaluator,
+  type TransactionContext,
   type TransactionEvent,
   type TransactionExecutor,
   type TransactionRecord,
@@ -58,6 +60,18 @@ export interface HarnessTransactionRuntimeOptions {
   readonly allowWithoutPolicy?: boolean;
   readonly requiredApprovers?: readonly ApprovalRequirement[];
   readonly onEvent?: TransactionRuntimeOptions["onEvent"];
+}
+
+export interface HarnessChangeSetExecutionOptions extends HarnessTransactionRuntimeOptions {
+  /** Optional mounted Adapter scope for validation/policy/provider isolation. */
+  readonly adapterId?: string;
+  readonly actor?: TransactionContext["actor"];
+  readonly environment?: string;
+  readonly expectedVersions?: TransactionContext["expectedVersions"];
+  readonly sessionId?: string;
+  readonly correlationId?: string;
+  readonly metadata?: TransactionContext["metadata"];
+  readonly signal?: AbortSignal;
 }
 
 export class HarnessRuntime {
@@ -152,6 +166,38 @@ export class HarnessRuntime {
           // guarantees are enforced by the explicit checkpoints above.
         }
       },
+    });
+  }
+
+  /**
+   * High-level governed path for durable engineering ChangeSets.
+   *
+   * This composes the existing TransactionRuntime rather than introducing a
+   * second mutation engine. When adapterId is supplied, the Adapter must be
+   * mounted and validation/policy execution is scoped to that provider.
+   */
+  async executeChangeSet(
+    changeSet: ChangeSet,
+    options: HarnessChangeSetExecutionOptions,
+  ): Promise<TransactionRecord> {
+    if (options.adapterId) this.adapters.get(options.adapterId);
+
+    const runtime = this.createTransactionRuntime({
+      executor: options.executor,
+      allowWithoutPolicy: options.allowWithoutPolicy,
+      requiredApprovers: options.requiredApprovers,
+      onEvent: options.onEvent,
+    });
+
+    return runtime.execute(changeSet, {
+      actor: options.actor,
+      environment: options.environment ?? this.environment,
+      adapterIds: options.adapterId ? [options.adapterId] : undefined,
+      expectedVersions: options.expectedVersions,
+      sessionId: options.sessionId,
+      correlationId: options.correlationId,
+      metadata: options.metadata,
+      signal: options.signal,
     });
   }
 
