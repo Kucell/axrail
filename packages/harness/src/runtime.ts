@@ -11,7 +11,6 @@ import {
   type ApprovalRequirement,
   isApprovalGranted,
 } from "@axrail/approval";
-import type { ChangeSet } from "@axrail/changesets";
 import {
   InMemoryEventStore,
   SessionService,
@@ -61,6 +60,8 @@ export interface HarnessTransactionRuntimeOptions {
   readonly requiredApprovers?: readonly ApprovalRequirement[];
   readonly onEvent?: TransactionRuntimeOptions["onEvent"];
 }
+
+export type HarnessChangeSet = Parameters<TransactionRuntime["execute"]>[0];
 
 export interface HarnessChangeSetExecutionOptions extends HarnessTransactionRuntimeOptions {
   /** Optional mounted Adapter scope for validation/policy/provider isolation. */
@@ -177,7 +178,7 @@ export class HarnessRuntime {
    * mounted and validation/policy execution is scoped to that provider.
    */
   async executeChangeSet(
-    changeSet: ChangeSet,
+    changeSet: HarnessChangeSet,
     options: HarnessChangeSetExecutionOptions,
   ): Promise<TransactionRecord> {
     if (options.adapterId) this.adapters.get(options.adapterId);
