@@ -1,190 +1,78 @@
 # RFC 0006: Adapter Protocol
 
-Status: Draft
+Status: **Implemented foundation / transaction semantics under active convergence**
 
-Defines the contract between Axrail and external engineering systems.
+This RFC defines how engineering systems integrate with Axrail without coupling the generic runtime to vendor-specific schemas or product implementations.
 
-## 1. Motivation
+The supported integration path is `@axrail/adapter-sdk` mounted through `AdapterHost` and composed by `HarnessRuntime`.
 
-Axrail must connect to HMI/SCADA, PLC engineering software, robotics platforms, MES, digital twins, CAD/CAE, and other engineering systems without hard-coding vendor concepts into the kernel.
+## 1. Goals
 
-Adapters provide that boundary.
+An Adapter should let an engineering system expose governed capabilities such as Tools, Artifacts, Validation, Policy, Context, Approval integration, and Transaction execution/participation while preserving provider identity, explicit routing, lifecycle isolation, governance before privileged effect, capability degradation reporting, and auditability.
 
-## 2. Design goals
+An Adapter must not become a privileged bypass around Tool or Transaction governance.
 
-An Axrail adapter should:
+## 2. Current public contract
 
-- expose capabilities without leaking vendor internals into the kernel;
-- provide tools, artifacts, context, validators, and policies;
-- report feature support explicitly;
-- support import/export or native operations where appropriate;
-- expose deterministic failure modes;
-- preserve transaction, policy, validation, approval, and audit guarantees.
-
-## 3. Adapter contract
+The current SDK shape is conceptually:
 
 ```ts
-export interface AxrailAdapter {
-  readonly id: string
-  readonly version: string
+interface AxrailAdapter {
+  id: string
+  version: string
 
   capabilities(): Promise<CapabilityManifest>
-
-  tools?(): ToolProvider[]
+  tools?(): ToolDefinition[]
   artifacts?(): ArtifactProvider
-  context?(): ContextProvider[]
+  context?(): AdapterContextProvider[]
   validators?(): Validator[]
   policies?(): PolicyProvider[]
   approvals?(): ApprovalProvider[]
-  transactions?(): TransactionParticipant
+  transactions?(): AdapterTransactionParticipant
+
+  initialize?(context: AdapterLifecycleContext): Promise<void> | void
+  start?(context: AdapterLifecycleContext): Promise<void> | void
+  stop?(context: AdapterLifecycleContext): Promise<void> | void
 }
 ```
 
-All optional surfaces are registered as Axrail capabilities.
+`AdapterHost` binds Tool/Validator/Policy provider identity to the Adapter and drains registered provider surfaces before external shutdown begins.
 
-## 4. Capability manifest
+## 3. Capability manifest
 
-Adapters MUST declare supported features.
-
-```ts
-export interface CapabilityManifest {
-  adapterId: string
-  adapterVersion: string
-  target?: {
-    vendor?: string
-    product?: string
-    version?: string
-  }
-  capabilities: Record<string, CapabilitySupport>
-}
-
-export type CapabilitySupport =
-  | { level: "exact" }
-  | { level: "compatible"; notes?: string }
-  | { level: "degraded"; notes: string }
-  | { level: "unsupported"; reason?: string }
-```
-
-The four support levels are:
-
-- `exact` — Axrail semantics map directly to the target system;
-- `compatible` — semantics are preserved with implementation differences;
-- `degraded` — only a subset is available;
-- `unsupported` — the target cannot provide the capability.
-
-Agents SHOULD inspect this manifest before constructing a ChangeSet.
-
-## 5. Artifact provider
-
-Adapters MAY expose engineering assets as Axrail Artifacts.
-
-```ts
-export interface ArtifactProvider {
-  get(ref: ArtifactRef): Promise<Artifact>
-  snapshot(ref: ArtifactRef): Promise<ArtifactSnapshot>
-  list?(query?: ArtifactQuery): Promise<Artifact[]>
-  watch?(ref: ArtifactRef): AsyncIterable<ArtifactEvent>
-}
-```
-
-Artifact identity SHOULD remain stable even when the underlying vendor object uses a different native identifier.
-
-## 6. Tool provider
-
-Adapters expose target-system operations through the Axrail Tool Runtime.
-
-Examples:
+Support levels are:
 
 ```text
-hmi.screen.create
-hmi.component.add
-plc.symbol.read
-plc.project.compile
-robot.program.validate
-mes.workflow.update
+exact
+compatible
+degraded
+unsupported
 ```
 
-Adapters MUST NOT allow registered tools to bypass Axrail policy, approval, transaction, validation, or audit stages.
+They allow the Harness/application to reason about whether a target actually supports preview, rollback, validation, deployment, context retrieval, or transactional guarantees.
 
-## 7. Context provider
+## 4. Provider identity and routing
 
-Adapters MAY contribute domain context.
+Semantic capability identity and provider identity are separate concerns.
 
-```ts
-export interface ContextProvider {
-  id: string
-  build(input: ContextRequest): Promise<ContextFragment>
-}
+Multiple Adapters may expose the same semantic Tool while Axrail still needs deterministic provider selection.
+
+```text
+semantic Tool name ≠ provider identity
 ```
 
-Examples include:
+Provider ambiguity for privileged execution should fail closed rather than select an arbitrary Adapter.
 
-- current HMI project structure;
-- target PLC platform and firmware;
-- current robot program;
-- deployment environment;
-- live versus design-time mode;
-- available assets and tags;
-- platform capability limits.
+The same provider-scoping principle applies to Validators, Policy providers, Artifact access, and explicit Context retrieval.
 
-## 8. Validators
+## 5. Lifecycle
 
-Adapters SHOULD register validators for vendor-specific constraints.
-
-Examples:
-
-- unsupported HMI component types;
-- invalid PLC address formats;
-- incompatible runtime versions;
-- robot program syntax errors;
-- target environment deployment restrictions.
-
-Adapter validation complements, but does not replace, generic Axrail validation.
-
-## 9. Policies
-
-Adapters MAY provide additional target-specific policy rules.
-
-Examples:
-
-- live PLC writes require operator approval;
-- production deployment requires an engineering role;
-- safety-related parameters cannot be changed through AI tools;
-- certain operations are only allowed in simulation mode.
-
-The final policy decision is the composition of global Axrail policy and adapter policy.
-
-## 10. Transaction participation
-
-Adapters may participate in one of three transaction modes:
-
-### Native atomic
-
-The target system supports true transactional mutation.
-
-### Compensating
-
-The adapter records enough state to undo successful operations when a later step fails.
-
-### Best effort
-
-The target cannot guarantee rollback. This limitation MUST be visible in the capability manifest and transaction plan.
-
-```ts
-export interface TransactionParticipant {
-  mode: "atomic" | "compensating" | "best-effort"
-  prepare?(tx: AdapterTransactionContext): Promise<void>
-  commit?(tx: AdapterTransactionContext): Promise<void>
-  rollback?(tx: AdapterTransactionContext): Promise<void>
-}
-```
-
-## 11. Adapter lifecycle
+The Adapter lifecycle is:
 
 ```text
 registered
   ↓
-initialized
+initializing
   ↓
 ready
   ↓
@@ -195,85 +83,212 @@ stopping
 stopped
 ```
 
-Initialization failures MUST be explicit and MUST NOT leave partial capabilities registered.
+A failed mount must clean up already-registered local surfaces. During unmount, local routing surfaces are removed before external `stop()` work begins.
 
-## 12. Namespacing
+## 6. Context providers
 
-Adapter capability and tool identifiers SHOULD be namespaced.
-
-Recommended tool naming:
+Context retrieval remains explicit and scoped:
 
 ```text
-<domain>.<resource>.<action>
+application / Harness
+      ↓
+explicit adapterIds
+      ↓
+Adapter Context Provider(s)
+      ↓
+Context fragments
 ```
 
-Examples:
+Sensitive fragments remain excluded unless explicitly requested. Returned Context is not automatically inserted into model prompts.
+
+The v0.2 direction adds a separate Context Assembly layer rather than weakening these rules.
+
+## 7. Policy and Validation
+
+Adapter Policy and Validation remain distinct:
 
 ```text
-hmi.screen.create
-plc.project.compile
-robot.program.validate
+Policy     → is this operation allowed?
+Validation → is the proposed/executed engineering change technically valid?
 ```
 
-Vendor-specific identifiers MAY include an additional adapter namespace when collisions are possible.
+Adapter-scoped providers must not accidentally evaluate operations belonging to another Adapter.
 
-## 13. External protocol bridging
+## 8. Approval providers
 
-An adapter may wrap REST, SDK, OPC UA, MCP, proprietary RPC, file formats, or local processes.
+Adapter-provided Approval providers are experimental in v0.1.
 
-The underlying protocol is an implementation detail. Axrail-facing contracts remain stable.
+They may be mounted for discovery, but Harness governance expects ApprovalService selection to be configured explicitly by the application.
 
-## 14. HMI reference adapter
+Future selection rules must define authority, scope, quorum composition and evidence binding.
 
-An AI-native HMI integration could expose:
+## 9. Transaction execution: current state
+
+`AdapterTransactionParticipant` currently exposes an experimental `prepare` / `commit` / `rollback` shape.
+
+The existing Harness does not yet orchestrate general multi-Adapter transaction participants automatically. These semantics should not be frozen before a real engineering integration exercises them.
+
+## 10. Transactional Mutation direction
+
+For durable engineering changes, the desired path is:
 
 ```text
-hmi.project.inspect
-hmi.screen.create
-hmi.component.add
-hmi.component.update
-hmi.binding.create
-hmi.alarm.create
-hmi.project.validate
-hmi.preview
-hmi.deploy
+Agent / Application Intent
+        ↓
+Tool / Change Proposal
+        ↓
+ChangeSet
+        ↓
+Harness Transaction API
+        ↓
+Policy
+        ↓
+Validation
+        ↓
+Approval
+        ↓
+Adapter Executor
+        ↓
+Apply
+        ↓
+Verify
+        ↓
+Commit / Rollback / Explicit Uncertainty
 ```
 
-The Axrail kernel does not know what a screen, component, alarm, or binding is; those concepts live in the adapter/domain layer.
+The Adapter protocol therefore needs to converge on executor semantics, not only participant lifecycle hooks.
 
-## 15. Security requirements
+Key questions for the next revision:
 
-Adapters MUST:
+1. How does Harness select the executor for a ChangeSet?
+2. Is selection based on Artifact provider, explicit Adapter IDs, ChangeSet metadata, or an application resolver?
+3. How are mixed-provider ChangeSets handled?
+4. How does an Adapter declare atomic, compensating or best-effort behavior?
+5. What constitutes preview versus prepare?
+6. Which verification occurs before commit and which occurs after external effect?
+7. When rollback is impossible, how is effect uncertainty represented?
+8. How are optimistic concurrency versions obtained and checked across Adapter boundaries?
 
-- avoid embedding secrets in events or artifacts;
-- propagate execution identity where possible;
-- expose environment boundaries such as design/test/production;
-- respect policy decisions from Axrail;
-- fail closed for privileged operations when the target state is ambiguous;
-- expose whether a tool can cause live physical effects.
+## 11. Single-Adapter transactions first
 
-## 16. Compatibility
+The next protocol iteration should prioritize:
 
-Adapters SHOULD declare:
+```text
+one ChangeSet
+  ↓
+one primary Adapter / engineering target
+  ↓
+one TransactionExecutor
+```
 
-- Axrail protocol version range;
-- adapter version;
-- target software version range;
-- optional feature flags.
+This is enough to validate the complete governed execution path in a real HMI integration.
 
-A future stable adapter manifest MAY use semantic version ranges.
+Distributed multi-Adapter transaction orchestration should wait until concrete use demonstrates the requirement.
 
-## 17. v0.1 minimum
+## 12. Mutation semantics by risk
 
-The initial Adapter SDK needs only:
+The protocol should support this architecture direction:
 
-1. adapter identity;
-2. capability manifest;
-3. tool registration;
-4. artifact provider;
-5. validators;
-6. policy hooks;
-7. transaction participation metadata;
-8. lifecycle hooks.
+```text
+L0 read/query
+  → direct governed Tool
 
-Import/export helpers and marketplace metadata can come later.
+L1 local/draft mutation
+  → Tool or Transaction depending on contract/policy
+
+L2 engineering modification
+  → ChangeSet + Transaction by default
+
+L3 deploy/overwrite
+  → Transaction required by default
+
+L4 physical effect
+  → explicit command semantics; do not pretend all actions are rollback-capable
+
+L5 safety critical
+  → explicit Transaction + Approval boundary and deterministic external safety controls
+```
+
+Adapters may impose stricter requirements.
+
+## 13. Preview capability
+
+Preview is a first-class engineering concern but not every target supports it equally.
+
+Adapters should report preview support through capability metadata as exact, compatible, degraded or unsupported.
+
+Preview output should remain tied to the same ChangeSet/evidence identity that is later validated and approved.
+
+## 14. Failure and uncertainty
+
+An Adapter must not turn unknown external state into a false success/failure claim.
+
+Examples include timeout after sending deployment, connection loss during commit, malformed confirmation after application, or failed rollback after partial application.
+
+The runtime should preserve explicit states such as:
+
+```text
+partially_applied
+execution_uncertain
+verification_failed
+rollback_failed
+```
+
+instead of encouraging unsafe automatic retry.
+
+## 15. HMI reference validation
+
+HMI/SCADA is the first reference domain for exercising this protocol.
+
+A real integration should test at least:
+
+```text
+project inspect
+screen inspect
+screen/component mutation
+ChangeSet generation
+precondition/version check
+validation
+preview
+approval
+apply
+verify
+commit
+rollback/recovery path
+```
+
+The proprietary HMI implementation remains outside the open-source repository. Findings that are genuinely generic should flow back into this RFC and `@axrail/adapter-sdk`.
+
+## 16. Compatibility targets
+
+Adapters may represent AI-native HMI systems, legacy HMI/SCADA, PLC engineering systems, OPC UA integrations, robot platforms, MES, digital twins, or CAD/CAE tools.
+
+Capability degradation is preferable to pretending unsupported transactional guarantees exist.
+
+## 17. Non-goals for the immediate revision
+
+Deferred unless real integrations require them:
+
+```text
+generic plugin marketplace
+arbitrary dynamic package loading
+multi-tenant cloud control plane
+distributed multi-Adapter transactions
+universal Adapter discovery service
+```
+
+## 18. Near-term acceptance criteria
+
+Before advanced Adapter transaction surfaces are considered stable, Axrail should demonstrate:
+
+1. a Harness-level high-level ChangeSet execution path;
+2. deterministic executor/Adapter selection for a single-target ChangeSet;
+3. provider-scoped Policy and Validation;
+4. Approval evidence bound to immutable ChangeSet/execution evidence;
+5. preview semantics or explicit unsupported/degraded reporting;
+6. apply/verify/commit/rollback behavior exercised by tests;
+7. explicit effect uncertainty where outcome cannot be proven;
+8. one real HMI Adapter vertical slice;
+9. a second substantially different integration before claiming broad protocol stability.
+
+Until then, the current Adapter SDK foundation remains supported while advanced transaction composition surfaces remain experimental.
