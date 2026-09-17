@@ -15,6 +15,7 @@
     "clean": "tsc -b tsconfig.build.json --clean",
     "test:unit": "tsx --test tests/*.test.ts",
     "test": "pnpm build && pnpm test:unit",
+    "test:coverage": "node scripts/test/coverage.mjs",
     "pack:smoke": "node scripts/release/pack-smoke.mjs",
     "release:dry-run": "pnpm check && pnpm test && pnpm pack:smoke"
   },
