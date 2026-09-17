@@ -2,7 +2,7 @@
 
 All notable changes to Axrail will be documented in this file.
 
-This project is pre-release. The repository and 15 supported public package manifests are currently prepared as `0.1.0-rc.1`. Architecture, hardening, runtime/package verification and repository-side publication workflows are complete, but no npm package, Git tag or GitHub Release is implied until an explicit publication action occurs.
+Axrail is currently in pre-release. The 15 supported public packages have been published to npm as `0.1.0-rc.1` under the `rc` dist-tag with GitHub Actions provenance. The corresponding Git tag and GitHub prerelease have not yet been finalized.
 
 ## [Unreleased]
 
@@ -70,9 +70,18 @@ This project is pre-release. The repository and 15 supported public package mani
 - Lockstep v0.1 versioning/release policy approved and documented in `docs/release/v0.1-versioning-release-policy.md`.
 - Final architecture Gate #21 passed focused re-review; post-RC hardening #22 is closed.
 - CI #222 passed Node 20, 22 and 24 with **73/73 behavioral tests**, dependency closure, 15 package tarballs, runtime imports, strict TypeScript consumer compilation, advanced Adapter SDK subpaths and packaged CLI verification.
-- CI #238 subsequently revalidated the complete main-branch path after publication mechanics/readiness updates.
+- CI #239 revalidated the final RC1 source/docs baseline before bootstrap publication.
 - Apache-2.0 license text is carried with each supported public package artifact.
-- Repository-side bootstrap, staged Trusted Publishing and GitHub Release-finalization workflows are implemented and fail closed until external npm/GitHub Environment configuration is completed.
-- **No npm package, Git tag or GitHub Release has been created by this work.**
+- Repository-side bootstrap, staged Trusted Publishing and GitHub Release-finalization workflows are implemented.
+
+### `0.1.0-rc.1` npm publication
+
+- Bootstrap First npm Release #1 / Actions run `35174115348` completed successfully.
+- Source/provenance commit: `e4758656c20f6cb90b05eb3429c79010667a2f7d`.
+- Exact publish artifact digest: `sha256:258ea4d791af0fcff46d642b9fb1e97eea7e315c6355aff1a2b170d183a96d1b`.
+- All 15 public `@axrail/*` packages were published as `0.1.0-rc.1` with npm dist-tag `rc`.
+- Publishing used `--provenance`; signed GitHub Actions provenance statements were added to the Sigstore transparency log.
+- The bootstrap workflow did **not** create a Git tag or GitHub Release.
+- Remaining closeout: revoke the bootstrap token, configure stage-only Trusted Publishers for all 15 packages, and finalize `v0.1.0-rc.1` as a GitHub prerelease from the exact published source commit.
 
 [Unreleased]: https://github.com/Kucell/axrail/compare/main...HEAD
