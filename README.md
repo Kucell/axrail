@@ -57,10 +57,16 @@ The implemented v0.1 foundation includes:
 
 The supported v0.1 package/API surface, TypeScript project-reference build strategy, lockstep version policy, final architecture Gate, and post-RC hardening are complete.
 
-The repository and 15 supported public package manifests are currently prepared as:
+All 15 supported public packages are published to npm as:
 
 ```text
 0.1.0-rc.1
+```
+
+using the `rc` dist-tag with GitHub Actions provenance. The published artifacts correspond to source commit:
+
+```text
+e4758656c20f6cb90b05eb3429c79010667a2f7d
 ```
 
 CI verifies on Node 20, 22, and 24:
@@ -89,52 +95,9 @@ strict NodeNext TypeScript consumer compile
 packaged axrail --version
 ```
 
-The package dry run is green, including Apache-2.0 LICENSE text in public package tarballs. v0.1 package output intentionally omits source/declaration map files because source files are not shipped. **No Axrail package has been published to npm and no Git tag/GitHub Release is implied by the prepared RC version.**
+The npm RC packages are public. The annotated `v0.1.0-rc.1` Git tag and GitHub prerelease are finalized separately after registry verification.
 
 See [v0.1 Release Readiness](docs/release/v0.1-readiness.md), [v0.1 Public API Surface](docs/release/v0.1-public-api.md), [Execution Boundary Semantics](docs/execution-semantics.md), and [Release Hardening](docs/release/README.md).
-
-## Development workspace: Kucell/axrail-agent
-
-The separate private repository `Kucell/axrail-agent` is **development tooling used to build this Axrail repository**.
-
-It is not part of the Axrail product runtime and must not be confused with the `@axrail/agent` package or other Agent-management capabilities implemented inside Axrail.
-
-```text
-Kucell/axrail-agent
-  = development-time Agent task management
-  = development plans / activities / decisions / handoffs / memory
-  = records how Axrail itself is being developed
-
-@axrail/agent
-  = Axrail product runtime package
-  = in-process model/tool AgentLoop
-
-@axrail/harness
-  = Axrail product runtime composition root
-  = tools / policy / approval / events / transactions / adapters / agents
-```
-
-The dependency direction is intentionally one-way:
-
-```text
-Development Agent
-      ↓
-Kucell/axrail-agent
-      ↓
-works on source code in
-Kucell/axrail
-      ↓
-builds Axrail product/runtime
-```
-
-Axrail packages must not import or depend on `Kucell/axrail-agent` at runtime.
-
-The two repositories record different classes of logs:
-
-- `Kucell/axrail-agent` records **development activity** such as implementation tasks, plans, CI results, code-review evidence, architecture decisions, and development handoffs.
-- Axrail `@axrail/events` records **product runtime execution** such as Agent sessions, Tool execution, Policy decisions, Approval, Transaction state, Commit, Rollback, and authoritative audit checkpoints.
-
-A CI run produced while developing `@axrail/transactions` can be referenced by `axrail-agent`; a customer's runtime `transaction.committed` event belongs to the Axrail application's EventStore, not the development repository.
 
 ## Vendor-neutral examples
 
@@ -270,16 +233,13 @@ The v0.1 CLI is intentionally read-only/diagnostic; it does not provide a privil
 
 ## Current priorities
 
-The functional scope, architecture gates (#19/#21), public API surface, package build, clean-consumer RC verification, and post-RC hardening (#22) are complete.
+The functional scope, architecture gates, public API surface, package build, clean-consumer RC verification, post-RC hardening, and first npm bootstrap publication are complete.
 
-Remaining v0.1 work is intentionally limited to the **public release boundary** tracked by #18:
+Remaining RC1 closeout is intentionally limited to:
 
-- tag/GitHub Release policy and automation;
-- npm authentication through GitHub environments/trusted publishing or secrets;
-- provenance/signing/attestation where supported;
-- explicit final maintainer approval before any registry publication.
-
-CI and no-publish RC workflows already pin third-party Actions to immutable commits. Until the public release boundary is crossed explicitly, Axrail remains **RC1 prepared, verified, not published**.
+- removing the one-time bootstrap npm credential;
+- configuring stage-only Trusted Publishers for subsequent releases;
+- finalizing the exact `v0.1.0-rc.1` Git tag and GitHub prerelease after registry verification.
 
 ## License
 
