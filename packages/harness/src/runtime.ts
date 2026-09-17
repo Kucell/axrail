@@ -63,9 +63,19 @@ export interface HarnessTransactionRuntimeOptions {
 
 export type HarnessChangeSet = Parameters<TransactionRuntime["execute"]>[0];
 
-export interface HarnessChangeSetExecutionOptions extends HarnessTransactionRuntimeOptions {
-  /** Optional mounted Adapter scope for validation/policy/provider isolation. */
-  readonly adapterId?: string;
+export interface ProviderBoundTransactionExecutor extends TransactionExecutor {
+  readonly providerId: string;
+}
+
+export interface HarnessChangeSetExecutionOptions {
+  /**
+   * Effecting executor and authoritative provider identity for this high-level
+   * mutation. Harness derives Adapter Policy/Validation scope from providerId.
+   */
+  readonly executor: ProviderBoundTransactionExecutor;
+  readonly allowWithoutPolicy?: boolean;
+  readonly requiredApprovers?: readonly ApprovalRequirement[];
+  readonly onEvent?: TransactionRuntimeOptions["onEvent"];
   readonly actor?: TransactionContext["actor"];
   readonly environment?: string;
   readonly expectedVersions?: TransactionContext["expectedVersions"];
@@ -174,14 +184,21 @@ export class HarnessRuntime {
    * High-level governed path for durable engineering ChangeSets.
    *
    * This composes the existing TransactionRuntime rather than introducing a
-   * second mutation engine. When adapterId is supplied, the Adapter must be
-   * mounted and validation/policy execution is scoped to that provider.
+   * second mutation engine. The executor's providerId is authoritative: the
+   * corresponding Adapter must be mounted and is used to scope Policy and
+   * Validation. Explicit Artifact providers must not conflict with it.
    */
   async executeChangeSet(
     changeSet: HarnessChangeSet,
     options: HarnessChangeSetExecutionOptions,
   ): Promise<TransactionRecord> {
-    if (options.adapterId) this.adapters.get(options.adapterId);
+    const providerId = options.executor.providerId;
+    if (!providerId) {
+      throw new Error("Provider-bound TransactionExecutor requires a non-empty providerId");
+    }
+
+    this.adapters.get(providerId);
+    assertChangeSetProviderBinding(changeSet, providerId);
 
     const runtime = this.createTransactionRuntime({
       executor: options.executor,
@@ -193,7 +210,7 @@ export class HarnessRuntime {
     return runtime.execute(changeSet, {
       actor: options.actor,
       environment: options.environment ?? this.environment,
-      adapterIds: options.adapterId ? [options.adapterId] : undefined,
+      adapterIds: [providerId],
       expectedVersions: options.expectedVersions,
       sessionId: options.sessionId,
       correlationId: options.correlationId,
@@ -462,6 +479,19 @@ class HarnessToolApproval implements ToolApprovalProvider {
 
     const decision = await this.harness.approval.request(request);
     return isApprovalGranted(request, decision, this.harness.currentTime());
+  }
+}
+
+function assertChangeSetProviderBinding(
+  changeSet: HarnessChangeSet,
+  providerId: string,
+): void {
+  for (const artifact of changeSet.artifacts) {
+    if (artifact.provider && artifact.provider !== providerId) {
+      throw new Error(
+        `ChangeSet artifact provider mismatch for ${artifact.id}: executor provider ${providerId}, artifact provider ${artifact.provider}`,
+      );
+    }
   }
 }
 
