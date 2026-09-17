@@ -1,5 +1,7 @@
 # Axrail
 
+**English** | [简体中文](README.zh-CN.md)
+
 **Transactional AI execution for industrial and engineering software.**
 
 Axrail is open-source harness infrastructure for AI agents that safely understand, modify, validate, and execute engineering workflows. It is intentionally independent of any vendor or private HMI implementation.
