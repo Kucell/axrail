@@ -53,7 +53,7 @@ Axrail 的目标不是简单的 `model → tool → execute`。重要工程变�
 - **`@axrail/hmi-adapter-kit`** — 构建在 `@axrail/adapter-sdk` 之上的可选厂商中立 HMI Domain SDK；它不是 Harness/Kernel 的依赖。
 - **`@axrail/cli`** — 只读诊断 CLI，用于 EventStore 检查与 ChangeSet 证据摘要计算。
 
-`@axrail/core` 仍保留在 monorepo 中，用于**实验性的 capability/plugin kernel 研究**。由于 RFC-0004 的 capability/plugin 语义尚未与已经工作的 `@axrail/harness` / AdapterHost 组合模型完全收敛，因此它是 private，并不属于 v0.1 支持的公共包集合。
+`@axrail/core` 仍保留在 monorepo 中，用于**实验性的 capability/plugin kernel 研究**。它保持 private，不属于 v0.1 支持的公共包集合；当前支持的组合模型是 `@axrail/harness` + `AdapterHost`，RFC-0004 属于探索性研究，而不是必须再引入第二套 Runtime Kernel 的要求。
 
 ## Release Candidate 状态
 
@@ -144,6 +144,8 @@ Commit
 
 商业 HMI、PLC IDE、Robot Platform、MES、CAD/CAE Tool 或 Digital Twin 环境，都可以通过 Axrail Adapter 替换 Mock Boundary。
 
+真实 AI-native HMI / 组态产品接入请直接使用 [AI-native HMI / 组态产品接入指南](docs/integrations/ai-native-hmi/README.zh-CN.md) 与 [接入反馈模板](docs/integrations/ai-native-hmi/feedback-template.md)。该指南面向 post-RC `main`，并明确区分当前 provider-bound 高层 mutation API 与已经发布的 npm `0.1.0-rc.1`。
+
 ## MCP 边界
 
 MCP 被视为互操作层，而不是 Axrail 的内部对象模型。
@@ -188,6 +190,8 @@ Axrail 的软件 Policy 与 Approval **不能替代** Safety PLC、Interlock、E
 
 - [Architecture overview](docs/architecture/README.md)
 - [Architecture and design](docs/architecture/design.md)
+- [AI-native HMI / 组态产品接入指南](docs/integrations/ai-native-hmi/README.zh-CN.md)
+- [HMI Integration Feedback Template](docs/integrations/ai-native-hmi/feedback-template.md)
 - [Execution boundary semantics](docs/execution-semantics.md)
 - [Audit model](docs/audit-model.md)
 - [Release hardening](docs/release/README.md)
@@ -201,6 +205,7 @@ Axrail 的软件 Policy 与 Approval **不能替代** Safety PLC、Interlock、E
 - [RFC-0006: Adapter Protocol](rfcs/0006-adapter-protocol/README.md)
 - [RFC-0007: Policy & Approval Model](rfcs/0007-policy-approval-model/README.md)
 - [RFC-0008: Event & Session Model](rfcs/0008-event-session-model/README.md)
+- [RFC-0009: Transactional Mutation Pipeline](rfcs/0009-transactional-mutation/README.md)
 
 ## Workspace
 
@@ -235,13 +240,23 @@ v0.1 CLI 刻意保持只读/诊断用途；它不提供绕过受治理工业副�
 
 ## 当前优先事项
 
-功能范围、Architecture Gate、公共 API Surface、Package Build、Clean-consumer RC 验证、RC 后 hardening，以及首次 npm bootstrap publication 都已完成。
+v0.1 Runtime/Release 基础以及首次 npm bootstrap publication 已完成。当前工程主线为：
 
-RC1 剩余 closeout 被明确限制为：
+```text
+Architecture Convergence
+  ↓
+Transactional Mutation
+  ↓
+Real HMI Adapter validation
+  ↓
+Engineering Runtime
+  ↓
+Second Adapter validation
+  ↓
+v0.2 stabilization
+```
 
-- 撤销一次性 bootstrap npm credential；
-- 为后续发布配置 stage-only Trusted Publisher；
-- 在 registry verification 后，对精确的 `v0.1.0-rc.1` Git tag 与 GitHub prerelease 完成 finalize。
+RC1 运维收口并行进行：为后续发布配置 stage-only Trusted Publisher，并从精确 provenance commit `e4758656c20f6cb90b05eb3429c79010667a2f7d` finalize `v0.1.0-rc.1` GitHub tag/prerelease。一次性 bootstrap npm credential 按维护者当前决定暂时保留，但不作为后续常规发布机制。
 
 ## License
 
