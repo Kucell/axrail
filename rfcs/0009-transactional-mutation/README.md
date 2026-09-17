@@ -171,11 +171,12 @@ If the ChangeSet changes after Approval, Approval must no longer authorize the m
 
 Applications should not have to manually instantiate and wire a TransactionRuntime for every normal engineering mutation.
 
-A future high-level Harness API may resemble conceptually:
+The first post-RC implementation on `main` exposes an experimental high-level path shaped as:
 
 ```ts
 await harness.executeChangeSet(changeSet, {
   adapterId,
+  executor,
   actor,
   environment,
   sessionId,
@@ -184,14 +185,17 @@ await harness.executeChangeSet(changeSet, {
 })
 ```
 
-The exact API is not frozen by this RFC.
+`executor` is currently explicit and required. `adapterId` is optional, but when provided it must identify an already mounted Adapter and scopes Adapter Policy/Validation/provider context for the Transaction. The implementation deliberately does not guess an executor or silently select the first mounted Adapter.
 
-The high-level operation should resolve:
+This post-RC API is not part of the already published `0.1.0-rc.1` artifact. Its exact public shape remains pre-stable and is being validated for a subsequent release.
+
+The current high-level operation composes:
 
 ```text
 ChangeSet
   ↓
-primary target Adapter / executor
+explicit TransactionExecutor
+  + optional mounted Adapter scope
   ↓
 TransactionRuntime
   ↓
@@ -199,24 +203,26 @@ Adapter-scoped Policy + Validation
   ↓
 Approval
   ↓
-execution
+Apply / Verify / Commit
 ```
 
-while retaining a lower-level TransactionRuntime API for advanced consumers.
+It reuses the existing TransactionRuntime rather than introducing a second mutation engine, while retaining the lower-level TransactionRuntime API for advanced consumers.
 
 ## 9. Executor resolution
 
-The first stable implementation should prioritize single-target execution.
+The first stable direction prioritizes single-target execution.
 
 ```text
 one ChangeSet
   ↓
-one primary Adapter
+one primary Adapter scope
   ↓
 one TransactionExecutor
 ```
 
-Executor resolution may use one or more explicit signals:
+The first implementation requires an application-supplied `TransactionExecutor` and optionally an explicit mounted `adapterId`. This keeps target selection deterministic while the Adapter executor-resolution contract is still being validated.
+
+Future executor resolution may use one or more explicit signals:
 
 - an application-supplied Adapter ID;
 - Artifact provider identity;
@@ -317,6 +323,8 @@ The executor can undo previously applied steps through compensation.
 
 Rollback cannot be guaranteed. This limitation must be explicit before Approval/commit.
 
+The v0.1 TransactionRuntime intentionally keeps rollback explicit after a failed phase because not every engineering or physical effect is safely reversible. The high-level `executeChangeSet()` slice preserves that behavior rather than silently adding automatic rollback. Automatic recovery policy, if added later, requires explicit semantics for target reversibility and uncertainty.
+
 ## 16. Effect uncertainty
 
 Industrial and engineering APIs may return an uncertain outcome.
@@ -390,9 +398,9 @@ uncertain external result
 
 ## 19. Compatibility and migration
 
-The published v0.1 Tool and Transaction APIs remain valid.
+The published v0.1 Tool and Transaction APIs remain valid. The npm `0.1.0-rc.1` artifacts correspond to source commit `e4758656c20f6cb90b05eb3429c79010667a2f7d`; they do not contain the post-RC `HarnessRuntime.executeChangeSet()` implementation described above.
 
-This RFC describes a higher-level convergence path for future versions. Existing consumers are not required to convert every Tool into a ChangeSet immediately.
+This RFC describes a higher-level convergence path for future versions. The first implementation is currently development evidence on `main`, not a retroactive modification of the published RC1 contract. Existing consumers are not required to convert every Tool into a ChangeSet immediately.
 
 Migration should occur incrementally:
 
@@ -404,7 +412,7 @@ Migration should occur incrementally:
 
 ## 20. Acceptance criteria
 
-The first implementation of this RFC is ready for stabilization when:
+The broader RFC is ready for stabilization when:
 
 1. Harness exposes a high-level ChangeSet execution path;
 2. one target Adapter/executor is resolved deterministically;
@@ -416,3 +424,5 @@ The first implementation of this RFC is ready for stabilization when:
 8. uncertainty states prevent unsafe automatic retry assumptions;
 9. a real HMI integration completes an end-to-end vertical slice;
 10. no public API requires `@axrail/core` to make the pipeline work.
+
+The initial Harness slice is intentionally narrower than full RFC stabilization: it establishes the high-level execution entry point, explicit Adapter/executor binding, provider-scoped governance, and behavioral validation while deferring preview/executor resolution and the real HMI vertical slice to subsequent Cortex tasks.
