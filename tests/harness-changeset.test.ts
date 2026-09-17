@@ -16,7 +16,7 @@ function changeSet(id: string) {
   };
 }
 
-test("Harness executeChangeSet runs a governed transaction in explicit Adapter scope", async () => {
+test("Harness executeChangeSet derives governed Adapter scope from executor provider", async () => {
   const harness = new HarnessRuntime({ environment: "engineering" });
   await harness.mountAdapter({
     id: "mock-hmi",
@@ -45,9 +45,9 @@ test("Harness executeChangeSet runs a governed transaction in explicit Adapter s
   let applied = false;
   let committed = false;
   const result = await harness.executeChangeSet(changeSet("cs-harness-success"), {
-    adapterId: "mock-hmi",
     executor: {
       id: "mock-hmi-executor",
+      providerId: "mock-hmi",
       mode: "compensating",
       apply(transaction) {
         assert.deepEqual(transaction.context.adapterIds, ["mock-hmi"]);
@@ -78,15 +78,15 @@ test("Harness executeChangeSet runs a governed transaction in explicit Adapter s
   assert.equal(result.context.environment, "engineering");
 });
 
-test("Harness executeChangeSet fails before execution when Adapter scope is not mounted", async () => {
+test("Harness executeChangeSet fails before execution when executor provider Adapter is not mounted", async () => {
   const harness = new HarnessRuntime();
   let applied = false;
 
   await assert.rejects(
     harness.executeChangeSet(changeSet("cs-missing-adapter"), {
-      adapterId: "missing-adapter",
       executor: {
         id: "should-not-run",
+        providerId: "missing-adapter",
         mode: "atomic",
         apply() {
           applied = true;
@@ -96,6 +96,48 @@ test("Harness executeChangeSet fails before execution when Adapter scope is not 
       allowWithoutPolicy: true,
     }),
     /Mounted adapter not found: missing-adapter/,
+  );
+
+  assert.equal(applied, false);
+});
+
+test("Harness executeChangeSet rejects Artifact provider mismatch before governance or effect", async () => {
+  const harness = new HarnessRuntime();
+  await harness.mountAdapter({
+    id: "provider-a",
+    version: "1.0.0",
+    async capabilities() {
+      return {
+        adapterId: "provider-a",
+        adapterVersion: "1.0.0",
+        capabilities: {},
+      };
+    },
+  });
+
+  let applied = false;
+  await assert.rejects(
+    harness.executeChangeSet(
+      {
+        id: "cs-provider-mismatch",
+        protocolVersion: "0.1",
+        artifacts: [{ id: "screen:overview", type: "hmi.screen", provider: "provider-b" }],
+        operations: [{ op: "update", target: "screen:overview" }],
+      },
+      {
+        executor: {
+          id: "provider-a-executor",
+          providerId: "provider-a",
+          mode: "atomic",
+          apply() {
+            applied = true;
+            return {};
+          },
+        },
+        allowWithoutPolicy: true,
+      },
+    ),
+    /ChangeSet artifact provider mismatch.*executor provider provider-a, artifact provider provider-b/,
   );
 
   assert.equal(applied, false);
@@ -127,9 +169,9 @@ test("Harness executeChangeSet preserves fail-closed Adapter policy", async () =
 
   let applied = false;
   const result = await harness.executeChangeSet(changeSet("cs-denied"), {
-    adapterId: "protected-hmi",
     executor: {
       id: "protected-executor",
+      providerId: "protected-hmi",
       mode: "atomic",
       apply() {
         applied = true;
@@ -179,9 +221,9 @@ test("Harness executeChangeSet scopes Adapter validation and blocks invalid muta
 
   let applied = false;
   const result = await harness.executeChangeSet(changeSet("cs-invalid"), {
-    adapterId: "validating-hmi",
     executor: {
       id: "validating-executor",
+      providerId: "validating-hmi",
       mode: "atomic",
       apply() {
         applied = true;
@@ -241,10 +283,10 @@ test("Harness executeChangeSet binds required approval to ChangeSet evidence bef
 
   let applied = false;
   const result = await harness.executeChangeSet(changeSet("cs-approved"), {
-    adapterId: "approval-hmi",
     requiredApprovers: [{ role: "engineer", count: 1 }],
     executor: {
       id: "approval-executor",
+      providerId: "approval-hmi",
       mode: "atomic",
       apply() {
         applied = true;
