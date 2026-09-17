@@ -2,63 +2,65 @@
 
 This directory is the release-readiness entry point for Axrail v0.1.
 
-Axrail's functional v0.1 scope is implemented, the first installable release-candidate artifacts have passed no-publish package verification, the final pre-release architecture Gate has passed focused re-review, the post-RC hardening follow-up is complete, and repository-side publication workflows are implemented.
+Axrail's functional v0.1 scope, architecture gates, post-RC hardening, package verification, and repository-side publication workflows are complete. The first npm release candidate has also been published successfully. Remaining RC1 closeout is limited to account-level credential/Trusted Publisher cleanup and GitHub Release finalization.
 
 ## Current state
 
 ```text
-Functional v0.1 scope             ✓ complete
-Governed-execution P1 gate #19    ✓ passed / closed
-Architecture P2 follow-up #20     ✓ resolved or explicitly scoped / closed
-Public API review #17             ✓ approved / applied / closed
-Package build #15                 ✓ tsc -b ESM+d.ts / closed
-Pack/install smoke #16            ✓ Node 20/22/24 / closed
-Frozen pnpm lockfile              ✓ enforced
-v0.1 lockstep version model       ✓ approved
-0.1.0-rc.1 no-publish dry run     ✓ package/runtime/TS smoke green
-Pre-release architecture #21      ✓ focused re-review passed / closed
-Post-RC hardening #22             ✓ completed / closed
-Publication workflows #18         ✓ repository-side mechanics implemented
-External npm/GitHub setup         ◐ required before first public publish
-Actual public release             ✗ not executed
+Functional v0.1 scope                 ✓ complete
+Governed-execution P1 gate #19        ✓ passed / closed
+Architecture P2 follow-up #20         ✓ resolved or explicitly scoped / closed
+Public API review #17                 ✓ approved / applied / closed
+Package build #15                     ✓ tsc -b ESM+d.ts / closed
+Pack/install smoke #16                ✓ Node 20/22/24 / closed
+Frozen pnpm lockfile                  ✓ enforced
+v0.1 lockstep version model           ✓ approved
+0.1.0-rc.1 no-publish dry run         ✓ package/runtime/TS smoke green
+Pre-release architecture #21          ✓ focused re-review passed / closed
+Post-RC hardening #22                 ✓ completed / closed
+Publication workflows #18             ✓ repository-side mechanics implemented
+npm 0.1.0-rc.1 publication            ✓ 15/15 packages published with provenance
+Bootstrap credential cleanup          ◐ pending account-side verification
+Trusted Publisher migration           ◐ pending account-side verification
+v0.1.0-rc.1 Git tag / GitHub release  ✗ not finalized
 ```
 
-**Architecture, hardening and repository automation Gates are GO. Axrail remains unpublished until the npm scope, protected GitHub Environments, first-release bootstrap credentials, and explicit maintainer publication action are configured/executed.**
+The 15 supported public packages are available on npm as `0.1.0-rc.1` under the `rc` dist-tag with GitHub Actions provenance. The published artifacts correspond to source commit:
 
-No Axrail package has been published to an npm registry by this work.
+```text
+e4758656c20f6cb90b05eb3429c79010667a2f7d
+```
+
+The npm publication is complete. RC1 is not fully finalized until the exact source commit is tagged as `v0.1.0-rc.1` and the GitHub prerelease is created by the protected finalization workflow.
 
 ## Release documents
 
-- [`v0.1-readiness.md`](v0.1-readiness.md) — current release-readiness state and remaining external publication setup.
-- [`npm-publication.md`](npm-publication.md) — operational first-publish bootstrap, Trusted Publisher, staged publishing, 2FA approval, and GitHub Release runbook.
-- [`notes/v0.1.0-rc.1.md`](notes/v0.1.0-rc.1.md) — prepared RC1 GitHub Release notes.
+- [`v0.1-readiness.md`](v0.1-readiness.md) — current release-readiness state and remaining RC1 closeout.
+- [`npm-publication.md`](npm-publication.md) — bootstrap history, Trusted Publisher setup, staged publishing, 2FA approval, and GitHub Release runbook.
+- [`notes/v0.1.0-rc.1.md`](notes/v0.1.0-rc.1.md) — RC1 GitHub Release notes.
 - [`v0.1-public-api.md`](v0.1-public-api.md) — approved supported package/API surface.
 - [`v0.1-build-strategy-analysis.md`](v0.1-build-strategy-analysis.md) — approved build architecture analysis.
 - [`v0.1-package-graph.md`](v0.1-package-graph.md) — package dependency topology, build layers, and clean-consumer smoke matrix.
 - [`v0.1-versioning-release-policy.md`](v0.1-versioning-release-policy.md) — approved v0.1 versioning/tag/release policy.
 - [`../execution-semantics.md`](../execution-semantics.md) — safety-relevant runtime boundary semantics for observers, timeout uncertainty, Adapter Policy isolation, and consumer verification.
 - [`../../CHANGELOG.md`](../../CHANGELOG.md) — human-readable release-note source of truth.
-- `Kucell/axrail-agent/ARCHITECTURE_REVIEW_PRE_RELEASE_2026-09-16.md` — pre-release review that opened #21.
-- `Kucell/axrail-agent/ARCHITECTURE_REVIEW_PRE_RELEASE_RECHECK_2026-09-16.md` — focused re-review that cleared #21.
 
-## Approved development decisions
+## Approved v0.1 decisions
 
-The following release gates are recorded as **approved** in `Kucell/axrail-agent`:
-
-### `D-v01-public-api-surface`
+### Public API surface
 
 - `@axrail/harness` is the primary application/runtime surface;
 - `@axrail/adapter-sdk` is the primary engineering-system integration SDK;
 - protocol/runtime primitives remain separately importable;
 - `@axrail/core` stays private/experimental/internal for v0.1.
 
-### `D-v01-package-build-strategy`
+### Package build strategy
 
 Axrail uses TypeScript project references / native `tsc -b` with NodeNext ESM and declaration emit. SDK packages are not bundled by default.
 
-### `D-v01-versioning-release-policy`
+### Versioning and release policy
 
-The 15 supported public packages use lockstep versions for the v0.1 line. The current prepared candidate is `0.1.0-rc.1`; serialized protocol versions remain independent.
+The 15 supported public packages use lockstep versions for the v0.1 line. The first published candidate is `0.1.0-rc.1`; serialized protocol versions remain independent.
 
 ## Implemented package/release verification
 
@@ -88,14 +90,14 @@ strict NodeNext TypeScript consumer compile
 packaged axrail --version
 ```
 
-CI #222 / Actions run `35093490803` passed the hardened runtime/package flow on Node 20, 22 and 24 with 73 behavioral tests. Publication workflow invariants are additionally covered by normal behavioral tests so later workflow edits cannot silently remove required Environments, OIDC, environment guards, immutable Action pins, or registry-before-tag ordering.
+CI validates Node 20, 22 and 24 with 73 behavioral tests. Publication workflow invariants are also covered by behavioral tests so later workflow edits cannot silently remove required Environments, OIDC/token boundaries, Environment guards, immutable Action pins, or registry-before-tag ordering.
 
 ## Publication architecture
 
-Because npm Trusted Publishing and staged publishing require a package to already exist, Axrail separates first publication from future releases:
+The first package publication and all subsequent releases intentionally use different trust paths:
 
 ```text
-First release
+First release — completed for 0.1.0-rc.1
   release-bootstrap.yml
     → verify exact tarballs
     → protected npm-release-bootstrap Environment
@@ -118,29 +120,38 @@ After all npm packages are public
     → protected github-release Environment
     → RELEASE_GUARD=enabled
     → verify all 15 registry versions
+    → verify exact source commit and release notes
     → annotated Git tag
     → GitHub Release
 ```
 
-The verified tarballs uploaded before an Environment approval are the same files consumed by the side-effecting publish/stage job; release jobs do not rebuild after approval.
+The verified tarballs uploaded before Environment approval are the same files consumed by the side-effecting publish/stage job; release jobs do not rebuild after approval.
 
 All third-party Actions in CI/release workflows are pinned to immutable commit SHAs.
 
-## External setup still required
+## `0.1.0-rc.1` bootstrap publication — COMPLETE
 
-Before the first public release, Issue #18 tracks the remaining account-level actions:
+`Bootstrap First npm Release #1` / Actions run `35174115348` completed successfully against source commit `e4758656c20f6cb90b05eb3429c79010667a2f7d`.
 
-- verify/create npm ownership of the `@axrail` scope and all 15 names;
-- enable npm maintainer 2FA;
-- configure protected GitHub Environments `npm-release-bootstrap`, `npm-release`, and `github-release`;
-- set `RELEASE_GUARD=enabled` on each Environment;
-- put only the one-time short-lived bootstrap token in `npm-release-bootstrap` as `NPM_TOKEN`;
-- explicitly approve/run the bootstrap publication;
-- revoke the bootstrap token immediately after success;
-- configure each package's Trusted Publisher for `release-stage.yml` + `npm-release`, stage-only;
-- require 2FA and disallow traditional token publishing after Trusted Publishing is verified;
-- explicitly approve future staged packages with npm 2FA;
-- explicitly finalize the GitHub Release.
+The workflow published all 15 supported `@axrail/*` packages under the `rc` dist-tag using `npm publish --provenance`, producing GitHub Actions provenance and Sigstore transparency-log entries. It intentionally did not create a Git tag or GitHub Release.
+
+## Remaining external closeout
+
+Issue #18 tracks the account-level steps that cannot be inferred solely from repository contents:
+
+- revoke/delete the one-time bootstrap npm token and remove the `npm-release-bootstrap` `NPM_TOKEN` secret;
+- configure each of the 15 npm packages with a GitHub Actions Trusted Publisher for `Kucell/axrail`, workflow `release-stage.yml`, Environment `npm-release`, stage-publish permission only;
+- after Trusted Publishing is verified, require 2FA and disable traditional token publishing where supported;
+- run `Finalize GitHub Release` with:
+
+```text
+version:     0.1.0-rc.1
+commit_sha:  e4758656c20f6cb90b05eb3429c79010667a2f7d
+confirm:     FINALIZE-RELEASE
+```
+
+- verify annotated tag `v0.1.0-rc.1` and the GitHub prerelease;
+- close #18 only after the above closeout is complete.
 
 ## Safety and compatibility reminder
 

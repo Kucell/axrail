@@ -1,13 +1,13 @@
 # npm Publication Runbook
 
-Status: publication mechanics implemented; **no publish workflow has been triggered by this work**.
+Status: **`0.1.0-rc.1` bootstrap publication completed successfully for all 15 supported public packages; remaining work is bootstrap credential cleanup, Trusted Publisher migration, and GitHub Release finalization.**
 
 Axrail uses two npm publication modes because npm Trusted Publishing and staged publishing require a package to already exist in the registry.
 
 ## Security model
 
 ```text
-First-ever package publication
+First-ever package publication — completed for 0.1.0-rc.1
   → protected GitHub Environment
   → short-lived bootstrap npm token
   → publish verified tarballs with provenance
@@ -24,31 +24,49 @@ Subsequent releases
 
 The verified tarballs produced before approval are the same files used for publication. The publish jobs do not rebuild packages after approval.
 
-## Required npm prerequisites
+## `0.1.0-rc.1` bootstrap publication — COMPLETE
 
-Before the first public release:
+The one-time **Bootstrap First npm Release** workflow completed successfully:
 
-1. Ensure the npm account/organization controls the `@axrail` scope and can create all 15 public package names.
-2. Enable 2FA on the maintainer npm account.
-3. Create a short-lived granular npm token suitable for the one-time first publication. Store it only as the `NPM_TOKEN` secret on the `npm-release-bootstrap` GitHub Environment. Revoke it immediately after the bootstrap release finishes.
+```text
+Actions run: 35174115348
+version:     0.1.0-rc.1
+source SHA:  e4758656c20f6cb90b05eb3429c79010667a2f7d
+dist-tag:    rc
+packages:    15/15
+provenance:  enabled
+```
 
-Trusted Publishing cannot be configured for a package that does not yet exist in the npm registry. Therefore the bootstrap workflow is intentionally separate and should never be used again after all 15 packages exist.
+The workflow:
+
+1. verified the requested lockstep version;
+2. ran frozen install, checks, build/tests and package smoke verification;
+3. retained the exact verified tarballs as an Actions artifact;
+4. passed the protected `npm-release-bootstrap` Environment;
+5. required `RELEASE_GUARD=enabled`;
+6. downloaded those exact tarballs;
+7. authenticated using the temporary Environment `NPM_TOKEN`;
+8. published all 15 packages in dependency order with `--access public --tag rc --provenance`.
+
+The publication produced GitHub Actions provenance and Sigstore transparency-log entries. The bootstrap workflow intentionally did **not** create a Git tag or GitHub Release.
+
+Do not use `release-bootstrap.yml` for future versions now that all 15 package names exist in npm.
+
+## Immediate post-bootstrap cleanup
+
+The following actions are account-level and must be explicitly verified by a maintainer:
+
+1. Revoke/delete the temporary bootstrap npm token.
+2. Remove the `NPM_TOKEN` secret from the `npm-release-bootstrap` GitHub Environment.
+3. Keep `release-bootstrap.yml` as historical/emergency documentation only; future normal releases use the Trusted Publishing path.
 
 ## Required GitHub Environments
 
-Create these environments under repository **Settings → Environments**. After the protection rules are configured, add an Environment variable named `RELEASE_GUARD` with the exact value `enabled` to each environment. Every side-effecting release job checks this variable before it can continue. This prevents an accidentally auto-created, unprotected Environment from being treated as configured.
-
 ### `npm-release-bootstrap`
 
-Used only by `.github/workflows/release-bootstrap.yml`.
+Used only by `.github/workflows/release-bootstrap.yml` for the already-completed first publication.
 
-Recommended protection:
-
-- required reviewer(s);
-- prevent self-review when the maintainer model supports it;
-- only the default branch or explicitly allowed release refs;
-- environment variable `RELEASE_GUARD=enabled`;
-- environment secret `NPM_TOKEN` containing only the temporary bootstrap token.
+The Environment should no longer contain a live npm write token after bootstrap cleanup.
 
 ### `npm-release`
 
@@ -58,7 +76,7 @@ Recommended protection:
 
 - required reviewer(s);
 - prevent self-review where practical;
-- environment variable `RELEASE_GUARD=enabled`;
+- Environment variable `RELEASE_GUARD=enabled`;
 - no long-lived npm token;
 - OIDC only (`id-token: write`).
 
@@ -70,36 +88,8 @@ Recommended protection:
 
 - required reviewer(s);
 - restrict to approved release refs/branches;
-- environment variable `RELEASE_GUARD=enabled`;
+- Environment variable `RELEASE_GUARD=enabled`;
 - no npm credentials.
-
-## First release: bootstrap
-
-Run **Bootstrap First npm Release** only after all architecture/build gates are green.
-
-Inputs for RC1:
-
-```text
-version = 0.1.0-rc.1
-confirm = PUBLISH-FIRST-RELEASE
-```
-
-The workflow:
-
-1. verifies the requested lockstep version;
-2. runs frozen install, check, build/tests and `pack:smoke`;
-3. retains the exact verified tarballs as an Actions artifact;
-4. waits on the `npm-release-bootstrap` Environment;
-5. requires `RELEASE_GUARD=enabled`;
-6. downloads those exact tarballs;
-7. authenticates with the temporary environment `NPM_TOKEN`;
-8. publishes all 15 packages in dependency order with `--access public --tag rc --provenance`.
-
-After a successful bootstrap:
-
-- revoke/delete the bootstrap npm token;
-- remove the `NPM_TOKEN` environment secret;
-- do not use the bootstrap workflow for future versions.
 
 ## Configure Trusted Publishers after bootstrap
 
@@ -114,9 +104,9 @@ Environment: npm-release
 Allowed action: stage publish only
 ```
 
-Use the package's npm settings page or `npm trust github` after the package exists.
+Use each package's npm settings page or the supported npm CLI flow after confirming the package exists.
 
-For maximum security, configure package publishing access to require 2FA and disallow traditional token publishing once Trusted Publishing has been verified.
+After Trusted Publishing is verified, configure package publishing access to require 2FA and disallow traditional token publishing where supported.
 
 ## Subsequent releases: trusted staged publishing
 
@@ -131,17 +121,15 @@ Final: version=0.1.0       dist_tag=latest
 
 The workflow runs the complete verification gate, uploads the verified tarballs, then waits on the `npm-release` Environment. The staging job requires `RELEASE_GUARD=enabled`, uses GitHub OIDC, and does not require a long-lived npm token.
 
-Each package is submitted with `npm stage publish`. A staged package is not public. A maintainer must review and approve the staged package on npmjs.com (or through npm CLI) with 2FA before it becomes public.
+Each package is submitted with `npm stage publish`. A staged package is not public. A maintainer must review and approve the staged package on npm with 2FA before it becomes public.
 
-## Finalize the GitHub Release
+## Finalize the `0.1.0-rc.1` GitHub Release
 
-Only after all 15 npm packages are visible at the intended version, run **Finalize GitHub Release**.
-
-Inputs:
+Only after bootstrap credential cleanup and Trusted Publisher configuration have been verified, run **Finalize GitHub Release** with the exact already-published source commit:
 
 ```text
-version = exact published version
-commit_sha = exact verified source commit
+version = 0.1.0-rc.1
+commit_sha = e4758656c20f6cb90b05eb3429c79010667a2f7d
 confirm = FINALIZE-RELEASE
 ```
 
@@ -159,13 +147,17 @@ The workflow:
 
 RC versions are marked as GitHub prereleases.
 
+For RC1, **do not substitute a later documentation commit for the provenance commit**. The correct commit remains:
+
+```text
+e4758656c20f6cb90b05eb3429c79010667a2f7d
+```
+
 ## Failure handling
 
-Publishing a package version is immutable. Never overwrite or reuse a published version.
+Published npm package versions are immutable. Never overwrite or reuse a published version.
 
-If bootstrap publishing partially succeeds, do not retry already-published package/version pairs blindly. Inspect registry state, finish only the missing packages if safe, record the incident in `axrail-agent`, and use a new RC version if artifact identity can no longer be demonstrated consistently.
-
-If staged publishing fails, staged versions may be reviewed/rejected through npm before attempting a corrected new version.
+If a future staged publication fails, review or reject the staged versions before attempting a corrected new version. If artifact identity can no longer be demonstrated consistently, use a new RC version rather than reusing an existing version number.
 
 ## Supply-chain requirements
 
