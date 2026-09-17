@@ -1,43 +1,95 @@
 # RFC 0004: Capability & Plugin Model
 
-Status: Draft
+Status: **Exploratory / not on the supported runtime path**
 
-Defines the capability contracts, plugin lifecycle, dependency model, scopes, and provider resolution rules used by the Axrail kernel.
+This RFC records capability/plugin architecture research for Axrail. It is **not** the current supported composition model.
 
-## 1. Motivation
+The implemented runtime is centered on:
 
-Axrail must remain independent of specific HMI, PLC, robot, MES, model, storage, policy, or validation implementations. The kernel therefore needs a small abstraction that lets providers contribute functionality without coupling consumers to concrete packages.
+```text
+@axrail/harness
+        ↓
+HarnessRuntime
+        ↓
+AdapterHost
+        ↓
+Tool / Artifact / Validation / Policy / Context provider surfaces
+```
 
-The design goal is:
+`@axrail/core` remains private/experimental/internal. The Harness does not depend on it.
 
-> Consumers depend on capabilities. Plugins provide capabilities.
+## 1. Why this RFC remains
 
-This preserves replaceability and allows multiple providers to coexist.
+Axrail still has legitimate future requirements that may benefit from a generic capability abstraction:
 
-## 2. Goals
+- replaceable model providers;
+- multiple engineering Adapters;
+- storage implementations;
+- scoped context or policy providers;
+- optional runtime extensions;
+- deterministic provider selection;
+- lifecycle and unload semantics.
 
-This RFC defines:
+However, v0.1 implementation work demonstrated that a generic plugin kernel should not be introduced merely because these concerns can be modeled generically.
 
-- capability identity
-- capability contracts
-- plugin manifests
-- plugin lifecycle
-- dependency declaration
-- provider registration
-- provider resolution
-- scopes
-- isolation
-- conflicts
-- version compatibility
-- failure behavior
+The current principle is therefore:
 
-This RFC does not define domain-specific HMI, PLC, or robotics models.
+> Prefer explicit typed runtime/Adapter surfaces first. Introduce a generic capability kernel only where repeated concrete integrations demonstrate that it materially reduces complexity.
 
-## 3. Capability
+This supersedes the earlier assumption that all runtime features must necessarily flow through a generic plugin container.
 
-A capability is a stable contract representing a category of runtime functionality.
+## 2. Current architecture boundary
 
-Examples:
+The supported v0.1 composition model is:
+
+```text
+Application
+    ↓
+HarnessRuntime
+    ├── Agent
+    ├── ToolRuntime
+    ├── TransactionRuntime
+    ├── EventStore / Sessions
+    ├── Approval
+    └── AdapterHost
+            ├── Tools
+            ├── Artifacts
+            ├── Validation
+            ├── Policy
+            └── Context
+```
+
+AdapterHost already provides lifecycle-managed, provider-scoped integration for engineering systems without requiring the public runtime to depend on `@axrail/core`.
+
+## 3. `@axrail/core` status
+
+For the current release line:
+
+```text
+package: @axrail/core
+version: 0.0.0
+private: true
+status: experimental research
+```
+
+It must not be treated as:
+
+- a required dependency of `@axrail/harness`;
+- part of the supported public v0.1 package set;
+- a contract that external Adapter authors must implement;
+- a stable plugin API.
+
+No compatibility guarantee is made for its current capability/plugin/scope implementation.
+
+## 4. Retained capability concepts
+
+The following concepts remain useful vocabulary and research directions.
+
+### Capability
+
+A capability is a stable category of functionality rather than a concrete provider.
+
+Potential examples:
 
 ```text
 axrail.tools
@@ -47,419 +99,130 @@ axrail.policy
 axrail.approval
 axrail.validation
 axrail.events
-axrail.sessions
 axrail.models
 axrail.adapters
 axrail.context
 ```
 
-A capability is not a concrete service implementation.
+### Provider
 
-```ts
-export interface Capability<T> {
-  id: string
-  version: string
-  contract?: T
-}
-```
+A provider supplies an implementation for a capability. Multiple providers may coexist where the contract supports scoped or multi-provider resolution.
 
-A capability identifier SHOULD use a reverse-domain-like namespace or Axrail-reserved namespace.
+### Scope
 
-Examples:
+A scope can constrain provider visibility and selection for a runtime, workspace, session, transaction, tenant, or test environment.
 
-```text
-axrail.tools
-axrail.validation
-vendor.hmi.project
-vendor.robot.motion
-```
+These concepts do not imply that Axrail must expose a single universal container API.
 
-## 4. Provider
+## 5. Where explicit typed surfaces are preferred
 
-A provider supplies an implementation for a capability.
-
-```ts
-export interface CapabilityProvider<T = unknown> {
-  id: string
-  capability: string
-  version: string
-  priority?: number
-  value: T
-}
-```
-
-Multiple providers MAY implement the same capability when the capability supports multi-provider resolution.
-
-Examples:
-
-- several validator providers
-- several tool providers
-- multiple context providers
-
-Some capabilities MAY be single-provider within a scope.
-
-Examples:
-
-- one primary transaction coordinator
-- one primary event store
-
-The capability definition SHOULD declare its resolution mode.
-
-```ts
-type CapabilityResolutionMode =
-  | "single"
-  | "multiple"
-  | "ordered"
-```
-
-## 5. Plugin
-
-A plugin is a lifecycle-managed unit that may register one or more capability providers.
-
-```ts
-export interface AxrailPlugin {
-  manifest: PluginManifest
-
-  setup(ctx: PluginSetupContext): void | Promise<void>
-  start?(ctx: PluginRuntimeContext): void | Promise<void>
-  stop?(ctx: PluginRuntimeContext): void | Promise<void>
-  dispose?(ctx: PluginRuntimeContext): void | Promise<void>
-}
-```
-
-A plugin SHOULD not reach into another plugin's private state. Cross-plugin collaboration SHOULD occur through capability contracts or events.
-
-## 6. Plugin Manifest
-
-```ts
-export interface PluginManifest {
-  id: string
-  version: string
-  axrail: string
-
-  provides?: CapabilityDeclaration[]
-  requires?: CapabilityRequirement[]
-  optional?: CapabilityRequirement[]
-
-  metadata?: Record<string, unknown>
-}
-```
-
-Example:
-
-```yaml
-id: vendor.hmi.adapter
-version: 0.1.0
-axrail: ">=0.1 <0.2"
-provides:
-  - capability: axrail.adapters
-    version: 1
-  - capability: axrail.tools
-    version: 1
-requires:
-  - capability: axrail.artifacts
-    version: 1
-optional:
-  - capability: axrail.approval
-    version: 1
-```
-
-## 7. Lifecycle
-
-The standard lifecycle is:
+Today the following areas intentionally use dedicated APIs:
 
 ```text
-registered
-   ↓
-resolved
-   ↓
-setup
-   ↓
-started
-   ↓
-running
-   ↓
-stopping
-   ↓
-stopped
-   ↓
-disposed
+Tools        → ToolRegistry / ToolRuntime
+Artifacts    → ArtifactProviderRegistry
+Validation   → ValidationPipeline
+Policy       → PolicyEngine
+Approval     → ApprovalService / explicit providers
+Adapters     → AdapterHost / AdapterRegistry
+Events       → EventStore
+Transactions → TransactionRuntime
 ```
 
-### registered
+Typed surfaces are preferable while they provide clearer invariants, stronger semantics and simpler failure behavior than a generic lookup container.
 
-Manifest is accepted and basic validation succeeds.
+## 6. Adapter lifecycle as the primary extension mechanism
 
-### resolved
+For engineering-system integration, Adapter lifecycle is the supported extension path.
 
-Required capabilities and compatible provider versions are resolved.
-
-### setup
-
-Plugin registers providers, hooks, schemas, and metadata. External side effects SHOULD be minimized.
-
-### started
-
-Plugin may open connections, initialize workers, subscribe to external systems, or allocate runtime resources.
-
-### stopped
-
-Plugin ceases active runtime behavior while preserving enough state for orderly shutdown.
-
-### disposed
-
-Plugin releases final resources and MUST no longer serve capability requests.
-
-## 8. Dependency Resolution
-
-Dependencies are capability-based rather than package-name-based.
-
-A plugin may require:
-
-```yaml
-requires:
-  - capability: axrail.transactions
-    version: 1
-```
-
-The kernel MUST fail plugin activation if a required capability cannot be resolved.
-
-Optional capabilities MUST NOT prevent activation.
-
-The kernel SHOULD report dependency errors with:
-
-- requesting plugin
-- required capability
-- required version range
-- available providers
-- rejection reason
-
-## 9. Provider Resolution
-
-For `single` resolution mode:
-
-1. filter by compatible version
-2. filter by scope visibility
-3. apply explicit user/runtime selection when configured
-4. otherwise apply highest priority
-5. fail on unresolved equal-priority ambiguity unless the capability defines deterministic tie-breaking
-
-For `multiple` mode:
-
-all compatible providers are returned.
-
-For `ordered` mode:
-
-providers are returned in deterministic priority order.
-
-Provider ordering MUST be stable across identical runtime configurations.
-
-## 10. Scopes
-
-Capabilities exist within scopes so that projects, transactions, sessions, or tenants can override or isolate providers.
-
-Suggested hierarchy:
+A mounted Adapter may contribute:
 
 ```text
-Runtime Scope
-   ↓
-Workspace Scope
-   ↓
-Session Scope
-   ↓
-Transaction Scope
+Tool definitions
+Artifact provider
+Validators
+Policy providers
+Context providers
+Approval providers (experimental selection semantics)
+Transaction participant (experimental)
 ```
 
-A child scope inherits visible providers from its parent unless overridden by capability rules.
+Provider identity is bound to the Adapter so same-name semantic Tools or Validators can coexist without losing provenance.
 
-```ts
-export interface Scope {
-  id: string
-  parent?: Scope
+This is currently more important to Axrail than a generic plugin lifecycle.
 
-  provide<T>(provider: CapabilityProvider<T>): Disposable
-  resolve<T>(capability: string): T
-  resolveAll<T>(capability: string): T[]
-}
-```
+## 7. Conditions for revisiting a generic capability kernel
 
-Typical use cases:
+A public capability/plugin kernel should be reconsidered only when concrete integrations expose repeated requirements that cannot be cleanly addressed through Harness and Adapter contracts.
 
-- workspace-specific HMI adapter
-- transaction-specific sandbox provider
-- session-specific model provider
-- test-specific fake capability
+Examples that could justify revisiting it:
 
-## 11. Capability Context
+- several non-Adapter extension classes need identical lifecycle and dependency semantics;
+- nested scopes become a recurring cross-package requirement;
+- users need deterministic late-bound provider replacement beyond Adapter scoping;
+- hot loading/unloading must coordinate multiple provider classes uniformly;
+- a stable plugin ecosystem requires a common manifest and compatibility contract.
 
-Consumers SHOULD receive a capability context rather than a global mutable container.
+Even then, the proposal must demonstrate that it simplifies the public API rather than creating a second runtime architecture beside HarnessRuntime.
 
-```ts
-export interface AxrailContext {
-  scope: Scope
-  events: EventEmitter
+## 8. Constraints on any future plugin model
 
-  get<T>(capability: string): T
-  getAll<T>(capability: string): T[]
-}
-```
+If this RFC later advances toward a supported API, it should preserve these constraints.
 
-Domain-specific convenience accessors MAY wrap generic resolution:
+### No ambient privileged bypass
 
-```ts
-ctx.tools
-ctx.transactions
-ctx.validation
-```
+A plugin mechanism must not allow a provider to bypass Tool governance, Transaction boundaries, Policy, Approval, Validation, or audit requirements.
 
-These accessors MUST still resolve through capability contracts.
+### Scope-aware resolution
 
-## 12. Plugin Isolation
+Provider selection must be explicit or deterministic and must fail closed on unsafe ambiguity.
 
-Plugins MUST NOT rely on undocumented kernel internals.
+### Lifecycle rollback
 
-The supported integration surfaces are:
+A provider from a failed setup/start sequence must not remain visible.
 
-- capability registration
-- capability resolution
-- lifecycle context
-- structured events
-- documented extension hooks
+### Active-use safety
 
-The kernel SHOULD expose no ambient global singleton that allows plugins to bypass scopes.
+Hot unload, if supported, must not dispose a provider while privileged executions or Transactions still rely on it.
 
-## 13. Failure Model
+### Compatibility separation
 
-Plugin failures are categorized as:
+Package/runtime versions, serialized protocol versions and capability contract versions may evolve independently where appropriate.
+
+## 9. Relationship to the v0.2 roadmap
+
+RFC-0004 is now a convergence task rather than an implementation mandate.
+
+Near-term priority is:
 
 ```text
-manifest_error
-dependency_error
-setup_error
-start_error
-runtime_error
-stop_error
-dispose_error
+1. Harness / Adapter architecture remains primary
+2. Transactional Mutation path is defined
+3. Real HMI Adapter exercises the boundaries
+4. Second engineering integration validates generality
+5. Only then decide whether a public generic plugin kernel is necessary
 ```
 
-A provider MUST NOT remain visible after failed setup.
-
-A plugin that fails during start SHOULD have setup registrations rolled back where possible.
-
-Critical kernel providers MAY mark startup as failed if they cannot initialize.
-
-Non-critical plugins MAY be disabled while the runtime continues.
-
-## 14. Hot Loading and Unloading
-
-Hot loading is desirable but not required for the first implementation.
-
-If supported, unload MUST respect active leases.
-
-A provider with active transaction or tool execution leases MUST NOT be disposed until those leases finish or are explicitly aborted.
+The expected outcome may be one of two valid results:
 
 ```text
-unload requested
-      ↓
-stop accepting new leases
-      ↓
-wait / abort active leases
-      ↓
-stop
-      ↓
-dispose
-      ↓
-unregister providers
+A. real integrations prove a generic kernel is useful
+   → redesign RFC-0004 from observed requirements
+
+B. Harness + Adapter contracts remain sufficient
+   → keep generic capability infrastructure internal or remove it
 ```
 
-## 15. Capability Versioning
+Both outcomes are acceptable. The architecture should be driven by execution requirements rather than preserving an early abstraction for its own sake.
 
-Capabilities SHOULD have their own contract versions separate from package versions.
+## 10. Open questions
 
-Example:
+The remaining questions should be answered through real integration work:
 
-```text
-Package @axrail/tools 0.7.3
-Capability axrail.tools v1
-```
+1. Which provider classes genuinely need nested scopes outside Adapter boundaries?
+2. Is a generic dependency graph required, or are typed Harness dependencies clearer?
+3. Which lifecycle behaviors repeat across model/storage/Adapter extensions?
+4. Would a plugin manifest improve compatibility for third-party integrations?
+5. Can future plugin loading preserve governed execution invariants without introducing an alternate side-effect path?
 
-This allows internal package releases without forcing protocol changes.
-
-Breaking contract changes MUST increment the capability major version.
-
-## 16. Plugin Trust
-
-Loading a plugin means allowing code to execute inside the Axrail runtime process unless sandboxed by a host environment.
-
-Plugin installation and capability trust are separate from tool execution policy.
-
-Axrail SHOULD eventually support metadata such as:
-
-```yaml
-trust:
-  publisher: verified
-  source: registry
-  signature: optional
-```
-
-This is deferred from v0.1 enforcement.
-
-## 17. Example
-
-```ts
-const plugin: AxrailPlugin = {
-  manifest: {
-    id: "example.hmi",
-    version: "0.1.0",
-    axrail: ">=0.1 <0.2",
-    provides: [
-      { capability: "axrail.tools", version: "1" },
-      { capability: "axrail.adapters", version: "1" }
-    ]
-  },
-
-  setup(ctx) {
-    ctx.provide({
-      id: "example.hmi.tools",
-      capability: "axrail.tools",
-      version: "1",
-      value: createHmiToolProvider()
-    })
-  }
-}
-```
-
-## 18. Kernel Constraints
-
-The Axrail kernel MUST remain unaware of concrete engineering concepts such as HMI screens, PLC tags, alarms, recipes, robot axes, or CAD features.
-
-Those concepts enter the runtime through plugin-provided capabilities.
-
-## 19. v0.1 Minimum Implementation
-
-The first implementation SHOULD include:
-
-- plugin manifest validation
-- explicit plugin registration
-- setup/start/stop/dispose lifecycle
-- capability registry
-- single/multiple/ordered resolution
-- hierarchical scopes
-- dependency validation
-- deterministic provider ordering
-- structured lifecycle events
-
-Deferred:
-
-- signed plugins
-- remote plugin distribution
-- dynamic process isolation
-- hot upgrades with state migration
-
-## 20. Open Questions
-
-1. Should capability identifiers include a formal URI scheme?
-2. Should version negotiation use SemVer ranges or integer protocol versions?
-3. Which capabilities are reserved under the `axrail.*` namespace?
-4. Should transaction scopes prevent provider replacement after execution begins?
-5. Should plugin manifests become a standalone JSON Schema distributed by Axrail?
+Until those questions have concrete answers, RFC-0004 remains exploratory and `@axrail/core` remains private.
