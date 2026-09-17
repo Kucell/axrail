@@ -175,8 +175,10 @@ The first post-RC implementation on `main` exposes an experimental high-level pa
 
 ```ts
 await harness.executeChangeSet(changeSet, {
-  adapterId,
-  executor,
+  executor: {
+    providerId,
+    ...transactionExecutor
+  },
   actor,
   environment,
   sessionId,
@@ -185,7 +187,9 @@ await harness.executeChangeSet(changeSet, {
 })
 ```
 
-`executor` is currently explicit and required. `adapterId` is optional, but when provided it must identify an already mounted Adapter and scopes Adapter Policy/Validation/provider context for the Transaction. The implementation deliberately does not guess an executor or silently select the first mounted Adapter.
+The high-level executor is explicitly provider-bound. `executor.providerId` is required and is the authoritative provider identity for the effect. Harness requires that provider to correspond to an already mounted Adapter, derives Adapter Policy/Validation scope from the same provider ID, and rejects declared ChangeSet Artifact providers that conflict with it.
+
+This invariant prevents governance from being evaluated under Adapter A while the actual external effect is performed by an executor for Adapter B. The lower-level `TransactionRuntime` remains unchanged for advanced composition.
 
 This post-RC API is not part of the already published `0.1.0-rc.1` artifact. Its exact public shape remains pre-stable and is being validated for a subsequent release.
 
@@ -194,12 +198,14 @@ The current high-level operation composes:
 ```text
 ChangeSet
   ↓
-explicit TransactionExecutor
-  + optional mounted Adapter scope
+ProviderBoundTransactionExecutor
+  │ providerId
+  ↓
+mounted Adapter scope
   ↓
 TransactionRuntime
   ↓
-Adapter-scoped Policy + Validation
+provider-scoped Policy + Validation
   ↓
 Approval
   ↓
@@ -215,19 +221,20 @@ The first stable direction prioritizes single-target execution.
 ```text
 one ChangeSet
   ↓
-one primary Adapter scope
+one provider-bound TransactionExecutor
   ↓
-one TransactionExecutor
+one mounted Adapter / engineering target
 ```
 
-The first implementation requires an application-supplied `TransactionExecutor` and optionally an explicit mounted `adapterId`. This keeps target selection deterministic while the Adapter executor-resolution contract is still being validated.
+The first implementation requires an application-supplied provider-bound `TransactionExecutor`. Harness derives the governance scope from `executor.providerId`; it does not accept a second independent Adapter ID for the high-level path. A missing mounted provider or an explicit Artifact-provider mismatch fails closed before Transaction execution begins.
 
 Future executor resolution may use one or more explicit signals:
 
-- an application-supplied Adapter ID;
 - Artifact provider identity;
 - ChangeSet target metadata;
-- an explicit executor resolver.
+- an explicit provider-aware executor resolver.
+
+Any future resolver must preserve the invariant that the provider governing Policy/Validation is the provider responsible for the effect.
 
 Unsafe ambiguity must fail closed.
 
@@ -415,7 +422,7 @@ Migration should occur incrementally:
 The broader RFC is ready for stabilization when:
 
 1. Harness exposes a high-level ChangeSet execution path;
-2. one target Adapter/executor is resolved deterministically;
+2. one target Adapter/executor is resolved deterministically and provider identity cannot diverge between governance and effect;
 3. L2/L3 mutation examples use ChangeSet + Transaction by default;
 4. Policy/Validation/Approval are bound to immutable ChangeSet evidence;
 5. preview support is explicit and evidence-bound;
@@ -425,4 +432,4 @@ The broader RFC is ready for stabilization when:
 9. a real HMI integration completes an end-to-end vertical slice;
 10. no public API requires `@axrail/core` to make the pipeline work.
 
-The initial Harness slice is intentionally narrower than full RFC stabilization: it establishes the high-level execution entry point, explicit Adapter/executor binding, provider-scoped governance, and behavioral validation while deferring preview/executor resolution and the real HMI vertical slice to subsequent Cortex tasks.
+The initial Harness slice is intentionally narrower than full RFC stabilization: it establishes the high-level execution entry point, provider-bound executor identity, fail-closed Artifact-provider checks, provider-scoped governance, and behavioral validation while deferring preview/executor resolution and the real HMI vertical slice to subsequent Cortex tasks.
