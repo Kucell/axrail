@@ -63,7 +63,9 @@ semantic Tool name ≠ provider identity
 
 Provider ambiguity for privileged execution should fail closed rather than select an arbitrary Adapter.
 
-The same provider-scoping principle applies to Validators, Policy providers, Artifact access, and explicit Context retrieval.
+The same provider-scoping principle applies to Validators, Policy providers, Artifact access, explicit Context retrieval, and high-level Transaction execution.
+
+For the high-level Transactional Mutation path, the effecting executor is provider-bound: the same provider identity that owns the executor is used to derive Policy and Validation scope. A caller must not be able to govern under Adapter A while executing through Adapter B.
 
 ## 5. Lifecycle
 
@@ -141,13 +143,16 @@ ChangeSet
         ↓
 Harness Transaction API
         ↓
+ProviderBoundTransactionExecutor
+        │ providerId
+        ↓
+Mounted Adapter scope
+        ↓
 Policy
         ↓
 Validation
         ↓
 Approval
-        ↓
-Adapter Executor
         ↓
 Apply
         ↓
@@ -158,30 +163,33 @@ Commit / Rollback / Explicit Uncertainty
 
 The Adapter protocol therefore needs to converge on executor semantics, not only participant lifecycle hooks.
 
-Key questions for the next revision:
+The first post-RC Harness slice resolves one key question: the effecting executor carries `providerId`, and Harness derives the mounted Adapter Policy/Validation scope from that identity. Declared Artifact providers that conflict with the executor provider fail closed before Transaction execution begins.
 
-1. How does Harness select the executor for a ChangeSet?
-2. Is selection based on Artifact provider, explicit Adapter IDs, ChangeSet metadata, or an application resolver?
-3. How are mixed-provider ChangeSets handled?
-4. How does an Adapter declare atomic, compensating or best-effort behavior?
-5. What constitutes preview versus prepare?
-6. Which verification occurs before commit and which occurs after external effect?
-7. When rollback is impossible, how is effect uncertainty represented?
-8. How are optimistic concurrency versions obtained and checked across Adapter boundaries?
+Remaining questions for the next revision include:
+
+1. How should a future provider-aware executor resolver discover the executor without weakening provider binding?
+2. How should mixed-provider ChangeSets be rejected or decomposed?
+3. How does an Adapter declare atomic, compensating or best-effort behavior beyond the executor mode itself?
+4. What constitutes preview versus prepare?
+5. Which verification occurs before commit and which occurs after external effect?
+6. When rollback is impossible, how is effect uncertainty represented?
+7. How are optimistic concurrency versions obtained and checked across Adapter boundaries?
 
 ## 11. Single-Adapter transactions first
 
-The next protocol iteration should prioritize:
+The next protocol iteration prioritizes:
 
 ```text
 one ChangeSet
   ↓
-one primary Adapter / engineering target
+one provider-bound TransactionExecutor
   ↓
-one TransactionExecutor
+one mounted Adapter / engineering target
 ```
 
 This is enough to validate the complete governed execution path in a real HMI integration.
+
+The high-level Harness path does not accept an independent Adapter ID separate from the executor provider identity. Missing mounted providers and explicit Artifact-provider mismatches fail closed.
 
 Distributed multi-Adapter transaction orchestration should wait until concrete use demonstrates the requirement.
 
@@ -282,8 +290,8 @@ universal Adapter discovery service
 Before advanced Adapter transaction surfaces are considered stable, Axrail should demonstrate:
 
 1. a Harness-level high-level ChangeSet execution path;
-2. deterministic executor/Adapter selection for a single-target ChangeSet;
-3. provider-scoped Policy and Validation;
+2. deterministic provider-bound executor/Adapter selection for a single-target ChangeSet;
+3. provider-scoped Policy and Validation that cannot diverge from the effecting executor provider;
 4. Approval evidence bound to immutable ChangeSet/execution evidence;
 5. preview semantics or explicit unsupported/degraded reporting;
 6. apply/verify/commit/rollback behavior exercised by tests;
