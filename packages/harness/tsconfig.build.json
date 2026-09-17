@@ -19,9 +19,6 @@
       "path": "../approval/tsconfig.build.json"
     },
     {
-      "path": "../changesets/tsconfig.build.json"
-    },
-    {
       "path": "../events/tsconfig.build.json"
     },
     {
