@@ -4,6 +4,7 @@ import type { PolicyProvider } from "@axrail/policy";
 import type { ToolDefinition } from "@axrail/tools";
 import type { TransactionMode } from "@axrail/transactions";
 import type { Validator } from "@axrail/validation";
+import type { SelectionContext } from "./selection.js";
 
 export type CapabilitySupport =
   | { readonly level: "exact" }
@@ -27,6 +28,12 @@ export interface CapabilityManifest {
 export interface AdapterContextRequest {
   readonly purpose: string;
   readonly artifactIds?: readonly string[];
+  /**
+   * Explicit UI/application selection snapshot for the current request.
+   * Adapters may use it to build normalized scoped Context, but Selection is
+   * not authorization and does not replace stable ChangeSet target identity.
+   */
+  readonly selection?: SelectionContext;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
