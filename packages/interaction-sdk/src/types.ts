@@ -11,6 +11,7 @@ import type { HarnessRuntime } from "@axrail/harness";
 
 export type InteractionTurnStatus =
   | "completed"
+  | "max_steps"
   | "cancelled";
 
 export interface InteractionRuntimeOptions {
@@ -151,8 +152,8 @@ export interface InteractionPlugin {
     api: InteractionPluginApi,
   ):
     | void
-    | (() => void)
-    | Promise<void | (() => void)>;
+    | (() => Promise<void> | void)
+    | Promise<void | (() => Promise<void> | void)>;
 }
 
 export interface MountedInteractionPlugin {
