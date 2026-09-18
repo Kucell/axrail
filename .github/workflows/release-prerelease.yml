@@ -248,14 +248,20 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Verify protected GitHub release environment
+      - name: Verify protected GitHub release environment and token
         env:
           RELEASE_GUARD: ${{ vars.RELEASE_GUARD }}
-        run: test "$RELEASE_GUARD" = "enabled"
+          RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RELEASE_GUARD" = "enabled"
+          test -n "$RELEASE_GITHUB_TOKEN"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.RELEASE_SHA }}
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
@@ -284,7 +290,7 @@ jobs:
           fi
       - name: Create or verify GitHub prerelease
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
