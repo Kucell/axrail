@@ -38,7 +38,7 @@ permissions:
 env:
   RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '0.2.0-alpha.1' }}
   RELEASE_DIST_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dist_tag || 'next' }}
-  RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha }}
+  RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || 'f1a73bf5522ebf6298cbd6bcd7b8f4d65b3d02bc' }}
   RELEASE_CONFIRM: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm || 'PUBLISH-PRERELEASE' }}
   RELEASE_PACKAGES: approval artifacts events policy tools validation changesets agent mcp model-openai-compatible model-ai-sdk cli transactions adapter-sdk hmi-adapter-kit harness interaction-sdk
 
