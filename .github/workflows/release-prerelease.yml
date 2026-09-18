@@ -112,8 +112,41 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  publish:
+  registry-status:
     needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      complete: ${{ steps.check.outputs.complete }}
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - id: check
+        name: Check whether npm publication is already complete
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -ra packages <<< "$RELEASE_PACKAGES"
+          complete=true
+
+          for package in "${packages[@]}"; do
+            spec="@axrail/${package}@${RELEASE_VERSION}"
+            actual="$(npm view "$spec" version --json 2>/dev/null | tr -d '"' || true)"
+            next_tag="$(npm view "@axrail/${package}" dist-tags.next 2>/dev/null || true)"
+
+            if [[ "$actual" == "$RELEASE_VERSION" && "$next_tag" == "$RELEASE_VERSION" ]]; then
+              echo "already complete: $spec (next)"
+            else
+              echo "not complete yet: $spec actual=${actual:-missing} next=${next_tag:-missing}"
+              complete=false
+            fi
+          done
+
+          echo "complete=$complete" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: [verify, registry-status]
+    if: ${{ needs.registry-status.outputs.complete != 'true' }}
     runs-on: ubuntu-latest
     environment: npm-release-bootstrap
     permissions:
@@ -165,7 +198,8 @@ jobs:
           done
 
   verify-registry:
-    needs: publish
+    needs: [verify, registry-status, publish]
+    if: ${{ always() && needs.verify.result == 'success' && needs.registry-status.result == 'success' && (needs.registry-status.outputs.complete == 'true' || needs.publish.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
