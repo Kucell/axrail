@@ -1,6 +1,7 @@
 import {
   AgentLoop,
   AgentSession,
+  type AgentEvent,
   type AgentModelProvider,
   type AgentRunContext,
   type AgentRunResult,
@@ -12,6 +13,14 @@ export interface HarnessAgentOptions {
   readonly model: AgentModelProvider;
   readonly systemPrompt?: string;
   readonly maxSteps?: number;
+  /**
+   * Optional observational Agent event callback.
+   *
+   * Harness persists the authoritative Session event first. Callback failures
+   * are isolated so UI/instrumentation observers cannot rewrite execution
+   * truth after an authoritative event has been recorded.
+   */
+  readonly onEvent?: (event: AgentEvent) => Promise<void> | void;
 }
 
 export interface HarnessAgentRunOptions extends AgentRunContext {
@@ -54,6 +63,12 @@ export class HarnessAgent {
             event: event.data,
           },
         });
+        try {
+          await this.options.onEvent?.(event);
+        } catch {
+          // Observational consumers (for example Interaction SDK/UI bridges)
+          // must not change authoritative Agent/Tool execution truth.
+        }
       },
     });
 
