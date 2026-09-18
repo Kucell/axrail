@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const packageNames = ["approval","artifacts","events","policy","tools","validation","changesets","agent","mcp","model-openai-compatible","cli","transactions","adapter-sdk","hmi-adapter-kit","harness","interaction-sdk"];
+const packageNames = ["approval","artifacts","events","policy","tools","validation","changesets","agent","mcp","model-openai-compatible","model-ai-sdk","cli","transactions","adapter-sdk","hmi-adapter-kit","harness","interaction-sdk"];
 const packageImports = packageNames.map((name) => `@axrail/${name}`);
 const advancedImports = [
   "@axrail/adapter-sdk/host",
