@@ -847,3 +847,52 @@ HMI Adapter
 
 - `docs/architecture/interaction-sdk-plugin-architecture.md`
 - RFC-0011
+
+
+## 26. AI 模型接入与切换
+
+模型接入不要放进 HMI Adapter，也不要放进 Harness。
+
+推荐分层：
+
+```text
+组态软件 Model Picker
+        ↓ modelId
+@axrail/interaction-sdk
+  ModelRegistry
+  capability check
+  provenance
+        ↓
+AgentModelProvider
+        ↑
+@axrail/model-* / 私有模型 Provider
+        ↓
+@axrail/agent
+        ↓
+@axrail/harness
+```
+
+第三方 UI 可以通过：
+
+```ts
+interaction.models.list()
+```
+
+生成模型下拉框，然后每次发送显式传：
+
+```ts
+await interaction.send({
+  message,
+  providerId: "your-hmi",
+  modelId: selectedModelId,
+  selection,
+});
+```
+
+不要在共享 InteractionRuntime 上做用户级全局 `setDefaultModel()`。用户偏好由产品 UI/应用保存，并在每个 turn 传入 `modelId`，避免多用户/多会话竞态。
+
+如当前操作明确需要 tool calling / reasoning / vision，可声明 `requiredModelCapabilities`；模型没有显式声明支持时会在 Agent/model 执行前 fail closed。
+
+模型 API key 不进入 ModelDescriptor、Context、Selection 或 Event。凭据留在具体 Model Provider 内部 resolver。
+
+详见 RFC-0012 与 `docs/architecture/model-registry-runtime-selection.md`。
