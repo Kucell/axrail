@@ -1,6 +1,6 @@
 {
   "name": "@axrail/harness",
-  "version": "0.1.0-rc.1",
+  "version": "0.2.0-alpha.1",
   "description": "Primary embeddable governed execution Harness for Axrail.",
   "license": "Apache-2.0",
   "type": "module",

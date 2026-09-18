@@ -1,6 +1,6 @@
 {
   "name": "@axrail/changesets",
-  "version": "0.1.0-rc.1",
+  "version": "0.2.0-alpha.1",
   "description": "Serializable engineering ChangeSet contracts and evidence helpers for Axrail.",
   "license": "Apache-2.0",
   "type": "module",

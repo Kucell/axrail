@@ -1,6 +1,6 @@
 {
   "name": "@axrail/policy",
-  "version": "0.1.0-rc.1",
+  "version": "0.2.0-alpha.1",
   "description": "Policy contracts and deny-overrides policy engine for Axrail.",
   "license": "Apache-2.0",
   "type": "module",

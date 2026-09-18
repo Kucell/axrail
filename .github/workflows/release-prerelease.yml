@@ -1,0 +1,306 @@
+name: Publish Axrail prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Lockstep prerelease version
+        required: true
+        default: 0.2.0-alpha.1
+        type: string
+      dist_tag:
+        description: npm dist-tag
+        required: true
+        default: next
+        type: string
+      commit_sha:
+        description: Exact source commit to publish
+        required: true
+        type: string
+      confirm:
+        description: Type PUBLISH-PRERELEASE to continue
+        required: true
+        type: string
+  push:
+    branches:
+      - release/v0.2.0-alpha.1
+    paths:
+      - .github/workflows/release-prerelease.yml
+
+concurrency:
+  group: axrail-prerelease-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || '0.2.0-alpha.1' }}
+  RELEASE_DIST_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dist_tag || 'next' }}
+  RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || 'f1a73bf5522ebf6298cbd6bcd7b8f4d65b3d02bc' }}
+  RELEASE_CONFIRM: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm || 'PUBLISH-PRERELEASE' }}
+  RELEASE_PACKAGES: approval artifacts events policy tools validation changesets agent mcp model-openai-compatible model-ai-sdk cli transactions adapter-sdk hmi-adapter-kit harness interaction-sdk
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RELEASE_CONFIRM" = "PUBLISH-PRERELEASE"
+          test "$RELEASE_DIST_TAG" = "next"
+          [[ "$RELEASE_VERSION" == 0.2.0-* ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Verify exact lockstep package manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import { readFile } from 'node:fs/promises';
+
+          const version = process.env.RELEASE_VERSION;
+          const packages = process.env.RELEASE_PACKAGES.split(' ');
+          const root = JSON.parse(await readFile('package.json', 'utf8'));
+          if (root.version !== version) {
+            throw new Error(`Root version ${root.version} does not match ${version}`);
+          }
+
+          for (const name of packages) {
+            const manifest = JSON.parse(
+              await readFile(`packages/${name}/package.json`, 'utf8'),
+            );
+            if (manifest.private === true) {
+              throw new Error(`Public release package is private: ${name}`);
+            }
+            if (manifest.version !== version) {
+              throw new Error(
+                `@axrail/${name} version ${manifest.version} does not match ${version}`,
+              );
+            }
+          }
+
+          const core = JSON.parse(
+            await readFile('packages/core/package.json', 'utf8'),
+          );
+          if (core.private !== true || core.version !== '0.0.0') {
+            throw new Error('@axrail/core must remain private at 0.0.0');
+          }
+          EOF
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm test:coverage
+      - name: Pack and clean-consumer verify exact release artifacts
+        env:
+          AXRAIL_ARTIFACT_DIR: artifacts/release-packages
+        run: pnpm pack:smoke
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: axrail-prerelease-${{ env.RELEASE_VERSION }}-${{ env.RELEASE_SHA }}
+          path: artifacts/release-packages/*.tgz
+          if-no-files-found: error
+          retention-days: 30
+
+  registry-status:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      complete: ${{ steps.check.outputs.complete }}
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - id: check
+        name: Check whether npm publication is already complete
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -ra packages <<< "$RELEASE_PACKAGES"
+          complete=true
+
+          for package in "${packages[@]}"; do
+            spec="@axrail/${package}@${RELEASE_VERSION}"
+            actual="$(npm view "$spec" version --json 2>/dev/null | tr -d '"' || true)"
+            next_tag="$(npm view "@axrail/${package}" dist-tags.next 2>/dev/null || true)"
+
+            if [[ "$actual" == "$RELEASE_VERSION" && "$next_tag" == "$RELEASE_VERSION" ]]; then
+              echo "already complete: $spec (next)"
+            else
+              echo "not complete yet: $spec actual=${actual:-missing} next=${next_tag:-missing}"
+              complete=false
+            fi
+          done
+
+          echo "complete=$complete" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: [verify, registry-status]
+    if: ${{ needs.registry-status.outputs.complete != 'true' }}
+    runs-on: ubuntu-latest
+    environment: npm-release-bootstrap
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Verify protected npm environment
+        env:
+          RELEASE_GUARD: ${{ vars.RELEASE_GUARD }}
+        run: test "$RELEASE_GUARD" = "enabled"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: axrail-prerelease-${{ env.RELEASE_VERSION }}-${{ env.RELEASE_SHA }}
+          path: artifacts/release-packages
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Verify npm authentication
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm --version
+          npm whoami
+      - name: Publish missing packages and set next dist-tag
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          read -ra packages <<< "$RELEASE_PACKAGES"
+
+          for package in "${packages[@]}"; do
+            spec="@axrail/${package}@${RELEASE_VERSION}"
+            tarball="artifacts/release-packages/axrail-${package}-${RELEASE_VERSION}.tgz"
+            test -f "$tarball"
+
+            if actual="$(npm view "$spec" version --json 2>/dev/null | tr -d '"')" && [[ "$actual" == "$RELEASE_VERSION" ]]; then
+              echo "already published: $spec"
+            else
+              echo "publishing: $spec"
+              npm publish "$tarball" --access public --tag "$RELEASE_DIST_TAG" --provenance
+            fi
+          done
+
+          for package in "${packages[@]}"; do
+            npm dist-tag add "@axrail/${package}@${RELEASE_VERSION}" "$RELEASE_DIST_TAG"
+          done
+
+  verify-registry:
+    needs: [verify, registry-status, publish]
+    if: ${{ always() && needs.verify.result == 'success' && needs.registry-status.result == 'success' && (needs.registry-status.outputs.complete == 'true' || needs.publish.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify all packages and next tags with registry propagation retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          read -ra packages <<< "$RELEASE_PACKAGES"
+
+          verify_package() {
+            local package="$1"
+            local spec="@axrail/${package}@${RELEASE_VERSION}"
+            local attempts=12
+            local delay=5
+
+            for attempt in $(seq 1 "$attempts"); do
+              actual="$(npm view "$spec" version --json 2>/dev/null | tr -d '"' || true)"
+              next_tag="$(npm view "@axrail/${package}" dist-tags.next 2>/dev/null || true)"
+
+              if [[ "$actual" == "$RELEASE_VERSION" && "$next_tag" == "$RELEASE_VERSION" ]]; then
+                echo "registry ok: $spec (next) [attempt $attempt]"
+                return 0
+              fi
+
+              echo "registry not propagated yet: $spec actual=${actual:-missing} next=${next_tag:-missing} attempt=$attempt/$attempts"
+              if [[ "$attempt" -lt "$attempts" ]]; then
+                sleep "$delay"
+              fi
+            done
+
+            echo "registry verification failed after retries: $spec" >&2
+            return 1
+          }
+
+          for package in "${packages[@]}"; do
+            verify_package "$package"
+          done
+
+  finalize:
+    needs: verify-registry
+    if: ${{ always() && needs.verify-registry.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: github-release
+    permissions:
+      contents: write
+    steps:
+      - name: Verify protected GitHub release environment and token
+        env:
+          RELEASE_GUARD: ${{ vars.RELEASE_GUARD }}
+          RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RELEASE_GUARD" = "enabled"
+          test -n "$RELEASE_GITHUB_TOKEN"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify release source and notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
+          test -f "docs/release/notes/v${RELEASE_VERSION}.md"
+      - name: Create or verify immutable tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${RELEASE_VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/${tag}:refs/tags/${tag}"
+            actual="$(git rev-list -n1 "${tag}")"
+            test "$actual" = "$RELEASE_SHA"
+            echo "tag already correct: ${tag}"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${tag}" -m "Axrail ${RELEASE_VERSION}"
+            git push origin "${tag}"
+          fi
+      - name: Create or verify GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${RELEASE_VERSION}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "GitHub release already exists: ${tag}"
+          else
+            gh release create "${tag}" \
+              --verify-tag \
+              --prerelease \
+              --title "Axrail ${RELEASE_VERSION}" \
+              --notes-file "docs/release/notes/v${RELEASE_VERSION}.md"
+          fi

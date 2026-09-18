@@ -1,6 +1,6 @@
 {
   "name": "@axrail/tools",
-  "version": "0.1.0-rc.1",
+  "version": "0.2.0-alpha.1",
   "description": "Governed Tool contracts, registry, invocation evidence, and runtime for Axrail.",
   "license": "Apache-2.0",
   "type": "module",

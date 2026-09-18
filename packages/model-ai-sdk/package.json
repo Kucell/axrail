@@ -1,6 +1,6 @@
 {
   "name": "@axrail/model-ai-sdk",
-  "version": "0.1.0-rc.1",
+  "version": "0.2.0-alpha.1",
   "description": "Vercel AI SDK model bridge for Axrail AgentModelProvider.",
   "license": "Apache-2.0",
   "type": "module",

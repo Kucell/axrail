@@ -922,3 +922,33 @@ Vercel AI SDK
 重要：AI SDK bridge 不给 Tool 配置 execute handler。模型产生的 Tool Call 仍必须返回 Axrail AgentLoop，由 ToolRuntime 执行 Policy / Approval / Audit / Tool effect。
 
 v0.2 运行要求：Node.js >=22.13.0。已经发布的 npm 0.1.0-rc.1 仍然是 Node >=20 的历史版本。
+
+
+## 28. npm 接入基线：0.2.0-alpha.1
+
+真实组态软件接入请固定使用 prerelease 版本，不要直接跟随 GitHub `main`：
+
+```bash
+pnpm add \
+  @axrail/harness@0.2.0-alpha.1 \
+  @axrail/interaction-sdk@0.2.0-alpha.1 \
+  @axrail/model-ai-sdk@0.2.0-alpha.1 \
+  @axrail/hmi-adapter-kit@0.2.0-alpha.1 \
+  @axrail/adapter-sdk@0.2.0-alpha.1
+```
+
+npm dist-tag 为：
+
+```text
+next
+```
+
+运行要求：
+
+```text
+Node.js >=22.13.0
+```
+
+组态产品使用的具体模型供应商 package（例如对应的 Vercel AI SDK provider）由产品自己安装和配置，凭据不进入 Axrail 配置/Context/Selection。
+
+第一轮真实接入、反馈和协议修正都应记录所使用的精确 Axrail npm 版本。
