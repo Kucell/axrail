@@ -57,6 +57,9 @@
       ],
       "@axrail/core": [
         "packages/core/src/index.ts"
+      ],
+      "@axrail/model-ai-sdk": [
+        "packages/model-ai-sdk/src/index.ts"
       ]
     }
   },
