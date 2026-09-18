@@ -1,3 +1,4 @@
+import { ModelRegistry } from "./models.js";
 import type {
   InteractionAfterTurnHook,
   InteractionBeforeTurnHook,
@@ -35,11 +36,17 @@ interface ContributorRecord {
 }
 
 export class InteractionPluginHost {
+  readonly models: ModelRegistry;
+
   private readonly mounted = new Map<string, MountedPluginRecord>();
   private readonly contributors = new Map<string, ContributorRecord>();
   private readonly beforeHooks: HookRecord<InteractionBeforeTurnHook>[] = [];
   private readonly afterHooks: HookRecord<InteractionAfterTurnHook>[] = [];
   private readonly eventListeners: ListenerRecord[] = [];
+
+  constructor(models: ModelRegistry = new ModelRegistry()) {
+    this.models = models;
+  }
 
   async mount(plugin: InteractionPlugin): Promise<MountedInteractionPlugin> {
     const pluginId = requiredId(plugin.id, "Interaction plugin id");
@@ -100,6 +107,7 @@ export class InteractionPluginHost {
     return Object.freeze({
       plugins: Object.freeze(this.list().slice()),
       contextContributors: Object.freeze([...this.contributors.keys()]),
+      modelIds: Object.freeze(this.models.list().map((model) => model.id)),
     });
   }
 
@@ -176,6 +184,10 @@ export class InteractionPluginHost {
     };
 
     return Object.freeze({
+      registerModel: (registration) => {
+        return remember(this.models.register(registration));
+      },
+
       registerContextContributor: (
         contributor: InteractionContextContributor,
       ): (() => void) => {
