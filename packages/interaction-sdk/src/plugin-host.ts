@@ -57,11 +57,14 @@ export class InteractionPluginHost {
           `Interaction plugin ${pluginId} setup must return void or a cleanup function`,
         );
       }
+      const cleanupFn = typeof cleanup === "function"
+        ? cleanup
+        : undefined;
 
       this.mounted.set(pluginId, {
         plugin,
         registrations: registrations.slice(),
-        cleanup,
+        cleanup: cleanupFn,
       });
       return freezePlugin(plugin);
     } catch (error) {
