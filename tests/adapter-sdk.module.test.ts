@@ -5,6 +5,9 @@ import {
   AdapterContextRegistry,
   AdapterHost,
   AdapterRegistry,
+  assertSelectionProvider,
+  createSelectionContext,
+  selectedTargetIds,
   requireCapability,
   supportsCapability,
   type AxrailAdapter,
@@ -250,4 +253,193 @@ test("Adapter capability helpers enforce minimum support levels", () => {
     () => requireCapability(manifest, "degraded", "compatible"),
     /does not satisfy capability degraded at level compatible/,
   );
+});
+
+
+test("SelectionContext validates explicit scoped selection and preserves provenance", () => {
+  const selection = createSelectionContext({
+    selectionId: " sel-1 ",
+    providerId: " hmi-a ",
+    source: " hmi.canvas ",
+    mode: "single",
+    targets: [{
+      targetId: " component-1 ",
+      targetType: " industrial.hmi.component ",
+      artifactId: " project-1 ",
+      parentId: " screen-1 ",
+      metadata: { role: "pump" },
+    }],
+    bounds: {
+      x: 10,
+      y: 20,
+      width: 30,
+      height: 40,
+      coordinateSpace: " screen:overview ",
+    },
+    timestamp: " 2026-09-18T01:00:00Z ",
+    metadata: { gesture: "click" },
+  });
+
+  assert.equal(selection.selectionId, "sel-1");
+  assert.equal(selection.providerId, "hmi-a");
+  assert.equal(selection.source, "hmi.canvas");
+  assert.equal(selection.targets[0]?.targetId, "component-1");
+  assert.equal(selection.targets[0]?.targetType, "industrial.hmi.component");
+  assert.equal(selection.targets[0]?.artifactId, "project-1");
+  assert.equal(selection.bounds?.coordinateSpace, "screen:overview");
+  assert.deepEqual(selectedTargetIds(selection), ["component-1"]);
+  assert.equal(Object.isFrozen(selection), true);
+  assert.equal(Object.isFrozen(selection.targets), true);
+  assert.equal(Object.isFrozen(selection.targets[0]), true);
+  assert.equal(Object.isFrozen(selection.bounds), true);
+  assert.equal(Object.isFrozen(selection.metadata), true);
+  assertSelectionProvider(selection, "hmi-a");
+  assert.throws(
+    () => assertSelectionProvider(selection, "hmi-b"),
+    /Selection provider mismatch/,
+  );
+});
+
+test("SelectionContext fails closed on invalid modes, identities and bounds", () => {
+  const target = { targetId: "component", targetType: "component" };
+  const base = {
+    selectionId: "selection",
+    providerId: "provider",
+    source: "canvas",
+  } as const;
+
+  assert.throws(
+    () => createSelectionContext({ ...base, selectionId: " ", mode: "single", targets: [target] }),
+    /selectionId must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({ ...base, providerId: " ", mode: "single", targets: [target] }),
+    /providerId must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({ ...base, source: " ", mode: "single", targets: [target] }),
+    /source must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({ ...base, mode: "single", targets: [] }),
+    /exactly one target/,
+  );
+  assert.throws(
+    () => createSelectionContext({ ...base, mode: "single", targets: [target, target] }),
+    /exactly one target/,
+  );
+  assert.throws(
+    () => createSelectionContext({ ...base, mode: "multiple", targets: [] }),
+    /at least one target/,
+  );
+  assert.throws(
+    () => createSelectionContext({ ...base, mode: "region", targets: [] }),
+    /requires bounds/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "single",
+      targets: [{ targetId: " ", targetType: "component" }],
+    }),
+    /targetId must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "single",
+      targets: [{ targetId: "c", targetType: " " }],
+    }),
+    /targetType must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "single",
+      targets: [{ targetId: "c", targetType: "component", artifactId: " " }],
+    }),
+    /artifactId must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "single",
+      targets: [{ targetId: "c", targetType: "component", parentId: " " }],
+    }),
+    /parentId must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "region",
+      targets: [],
+      bounds: { x: Number.NaN, y: 0, width: 1, height: 1 },
+    }),
+    /bounds x must be finite/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "region",
+      targets: [],
+      bounds: { x: 0, y: 0, width: -1, height: 1 },
+    }),
+    /width\/height must not be negative/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "region",
+      targets: [],
+      bounds: { x: 0, y: 0, width: 1, height: 1, coordinateSpace: " " },
+    }),
+    /coordinateSpace must be a non-empty string/,
+  );
+  assert.throws(
+    () => createSelectionContext({
+      ...base,
+      mode: "single",
+      targets: [target],
+      timestamp: " ",
+    }),
+    /timestamp must be a non-empty string/,
+  );
+  assert.throws(() => assertSelectionProvider(
+    createSelectionContext({ ...base, mode: "single", targets: [target] }),
+    " ",
+  ), /providerId must be a non-empty string/);
+});
+
+test("Adapter Context providers receive the explicit current Selection snapshot", async () => {
+  const selection = createSelectionContext({
+    selectionId: "sel-current",
+    providerId: "selection-adapter",
+    source: "canvas",
+    mode: "single",
+    targets: [{ targetId: "component-1", targetType: "component" }],
+  });
+  let observedSelection: unknown;
+  const host = new AdapterHost();
+  await host.mount(makeAdapter("selection-adapter", "1", {
+    context() {
+      return [{
+        id: "selection",
+        async build(request) {
+          observedSelection = request.selection;
+          return {
+            providerId: "selection-adapter",
+            kind: "selection",
+            content: request.selection,
+          };
+        },
+      }];
+    },
+  }));
+
+  const fragments = await host.buildContext(
+    { purpose: "scoped-edit", selection },
+    { adapterIds: ["selection-adapter"] },
+  );
+  assert.equal(observedSelection, selection);
+  assert.equal(fragments[0]?.content, selection);
 });
