@@ -61,6 +61,7 @@ Core owns:
   plugin lifecycle
 
 Plugins may extend:
+  model registrations
   context contributions
   pre-turn checks
   post-turn observers
@@ -234,6 +235,10 @@ interface InteractionPlugin {
 }
 
 interface InteractionPluginApi {
+  registerModel(
+    registration: InteractionModelRegistration
+  ): () => void
+
   registerContextContributor(
     contributor: InteractionContextContributor
   ): () => void
@@ -252,7 +257,7 @@ interface InteractionPluginApi {
 }
 ```
 
-The plugin API does not expose `TransactionRuntime`, `PolicyEngine`, `ApprovalService` or direct privileged mutation methods.
+The plugin API may register model providers on the intent side, but does not expose `TransactionRuntime`, `PolicyEngine`, `ApprovalService` or direct privileged mutation methods.
 
 ## 10. Plugin failure semantics
 
@@ -357,3 +362,22 @@ plugin package conventions
 ```
 
 only after the core contracts are exercised by a real engineering product.
+
+
+## 15. Model registry extension
+
+Phase 3A.3 extends the Interaction Core with `ModelRegistry`.
+
+```text
+InteractionPlugin
+      ↓ registerModel()
+ModelRegistry
+      ↓ explicit modelId per turn
+AgentModelProvider
+      ↓
+HarnessAgent
+```
+
+Model plugins remain intent-side extensions. Model identity/provenance does not grant engineering execution authority.
+
+See `docs/architecture/model-registry-runtime-selection.md` and RFC-0012.
