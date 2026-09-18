@@ -811,3 +811,15 @@ Use `requiredModelCapabilities` when a turn requires capabilities such as tool c
 Model credentials remain inside concrete providers and are not copied into descriptors, Context, Selection or events.
 
 See RFC-0012 and `docs/architecture/model-registry-runtime-selection.md`.
+
+## 27. Preferred v0.2 model-provider integration
+
+For post-RC/v0.2 integrations, prefer `@axrail/model-ai-sdk` backed by the Vercel AI SDK provider ecosystem rather than maintaining one Axrail HTTP client per model vendor.
+
+The product creates the concrete AI SDK `LanguageModel` using the provider package it needs, wraps it in `AiSdkModelProvider`, and registers it with the Interaction ModelRegistry.
+
+Credentials stay in provider configuration/secret resolution and are never copied into Axrail model descriptors, Context, Selection or events.
+
+The bridge intentionally provides Tool schemas without execute handlers. AI SDK may request a Tool, but Axrail AgentLoop/ToolRuntime remains the only engineering Tool execution path.
+
+v0.2 requires Node.js >=22.13.0. Published npm 0.1.0-rc.1 remains the historical Node >=20 release.
