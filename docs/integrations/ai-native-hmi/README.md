@@ -823,3 +823,113 @@ Credentials stay in provider configuration/secret resolution and are never copie
 The bridge intentionally provides Tool schemas without execute handlers. AI SDK may request a Tool, but Axrail AgentLoop/ToolRuntime remains the only engineering Tool execution path.
 
 v0.2 requires Node.js >=22.13.0. Published npm 0.1.0-rc.1 remains the historical Node >=20 release.
+
+## 28. npm integration baseline: 0.2.0-alpha.1
+
+Real HMI/configuration-product integrations should pin the published npm prerelease instead of following GitHub `main`.
+
+### 28.1 Current published baseline
+
+```text
+version:   0.2.0-alpha.1
+dist-tag:  next
+runtime:   Node.js >=22.13.0
+packages:  17 public @axrail/* packages
+```
+
+The two packages that are **new relative to 0.1.0-rc.1** are:
+
+```text
+@axrail/interaction-sdk
+@axrail/model-ai-sdk
+```
+
+That does not mean only two packages were published. The previous 15 public packages were also published at `0.2.0-alpha.1`, for a total of 17.
+
+`@axrail/core` remains private/experimental and is not published.
+
+### 28.2 Why npm may still show 0.1.0-rc.1
+
+`0.2.0-alpha.1` is published under:
+
+```text
+next
+```
+
+The alpha release intentionally does not replace `latest`, and it does not overwrite the existing `rc` tag.
+
+As a result, the default version shown on an npm package page may still be:
+
+```text
+0.1.0-rc.1
+```
+
+This does not mean the alpha was not published.
+
+For integration work, verify the exact version or the `next` dist-tag instead of relying on the package page's default version display.
+
+### 28.3 Verify the published version
+
+```bash
+npm view @axrail/harness@0.2.0-alpha.1 version
+npm view @axrail/interaction-sdk@0.2.0-alpha.1 version
+npm view @axrail/model-ai-sdk@0.2.0-alpha.1 version
+```
+
+Expected result:
+
+```text
+0.2.0-alpha.1
+```
+
+Check dist-tags:
+
+```bash
+npm view @axrail/harness dist-tags
+npm view @axrail/interaction-sdk dist-tags
+```
+
+The `next` tag should point to `0.2.0-alpha.1`.
+
+You may install the current prerelease with `@next`, but real product integrations should pin the exact version so later alpha/beta releases do not silently change the dependency set.
+
+### 28.4 Recommended HMI install
+
+```bash
+pnpm add \
+  @axrail/harness@0.2.0-alpha.1 \
+  @axrail/interaction-sdk@0.2.0-alpha.1 \
+  @axrail/model-ai-sdk@0.2.0-alpha.1 \
+  @axrail/hmi-adapter-kit@0.2.0-alpha.1 \
+  @axrail/adapter-sdk@0.2.0-alpha.1
+```
+
+Add lower-level Axrail packages only when the product directly uses those APIs; there is no need to install all 17 packages into every HMI application.
+
+### 28.5 Model-provider dependency
+
+`@axrail/model-ai-sdk` is the bridge to Vercel AI SDK. It does not install every vendor provider package.
+
+The embedding product installs the provider it actually uses, for example:
+
+```bash
+pnpm add @ai-sdk/openai
+```
+
+or the corresponding Anthropic / Google / compatible / private provider.
+
+API keys/tokens stay inside provider configuration or secret resolution and are not copied into Axrail ModelDescriptor, Context, Selection or Event data.
+
+### 28.6 Release identity
+
+```text
+npm version:       0.2.0-alpha.1
+npm dist-tag:      next
+Git tag:           v0.2.0-alpha.1
+GitHub prerelease: Axrail 0.2.0-alpha.1
+publish source:    f1a73bf5522ebf6298cbd6bcd7b8f4d65b3d02bc
+```
+
+Record the exact Axrail npm version in every integration report, issue, compatibility test and product-side feedback entry.
+
+Do not record only `@next`; record the resolved immutable version such as `0.2.0-alpha.1`.
