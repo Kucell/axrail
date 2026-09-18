@@ -997,3 +997,35 @@ Model identity is provenance only. It cannot lower Tool risk, bypass Approval, r
 Public model descriptors intentionally contain no credentials. API keys/tokens remain inside concrete model-provider configuration/resolvers.
 
 See `docs/architecture/model-registry-runtime-selection.md` and RFC-0012.
+
+## 23. Vercel AI SDK provider convergence
+
+For v0.2, Axrail raises the post-RC runtime baseline to Node.js >=22.13.0 and stops treating vendor model HTTP protocols as a core maintenance responsibility.
+
+```text
+Interaction ModelRegistry
+        ↓
+AgentModelProvider
+        ▲
+@axrail/model-ai-sdk
+        ↓
+Vercel AI SDK LanguageModel
+        ↓
+application-selected provider package
+```
+
+`@axrail/agent` remains the stable model-neutral protocol. `@axrail/interaction-sdk` remains responsible for model selection/capability/provenance. `@axrail/harness` remains model-agnostic.
+
+`@axrail/model-ai-sdk` executes exactly one model step. It supplies Tool schemas to AI SDK without execute handlers, so AI SDK can request Tools but cannot become a second engineering Tool runtime. Axrail AgentLoop and ToolRuntime remain authoritative for Policy, Approval, Audit and effects.
+
+The existing `@axrail/model-openai-compatible` package remains as a lightweight/reference compatibility path. New model vendors should normally be integrated through the AI SDK bridge rather than new Axrail-maintained HTTP clients.
+
+Runtime baseline:
+
+```text
+published RC1: Node >=20
+post-RC / v0.2: Node >=22.13.0
+CI: 22 / 24 / 26
+```
+
+See RFC-0013 and `docs/architecture/model-provider-ai-sdk-convergence.md`.

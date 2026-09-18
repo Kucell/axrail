@@ -1,7 +1,7 @@
 {
-  "name": "@axrail/harness",
+  "name": "@axrail/model-ai-sdk",
   "version": "0.1.0-rc.1",
-  "description": "Primary embeddable governed execution Harness for Axrail.",
+  "description": "Vercel AI SDK model bridge for Axrail AgentModelProvider.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -24,19 +24,15 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Kucell/axrail.git",
-    "directory": "packages/harness"
+    "directory": "packages/model-ai-sdk"
   },
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
     "clean": "tsc -b tsconfig.build.json --clean"
   },
   "dependencies": {
-    "@axrail/adapter-sdk": "workspace:*",
     "@axrail/agent": "workspace:*",
-    "@axrail/approval": "workspace:*",
-    "@axrail/events": "workspace:*",
-    "@axrail/policy": "workspace:*",
-    "@axrail/tools": "workspace:*",
-    "@axrail/transactions": "workspace:*"
+    "ai": "^7.0.0",
+    "@types/json-schema": "^7.0.15"
   }
 }

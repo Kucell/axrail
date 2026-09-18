@@ -896,3 +896,29 @@ await interaction.send({
 模型 API key 不进入 ModelDescriptor、Context、Selection 或 Event。凭据留在具体 Model Provider 内部 resolver。
 
 详见 RFC-0012 与 `docs/architecture/model-registry-runtime-selection.md`。
+
+## 27. v0.2 推荐模型 Provider 接法
+
+v0.2/post-RC 的推荐方式是：
+
+```text
+组态软件 Model Picker
+        ↓
+Interaction ModelRegistry
+        ↓
+AgentModelProvider
+        ▲
+@axrail/model-ai-sdk
+        ↓
+Vercel AI SDK
+        ↓
+@ai-sdk/<你们实际使用的供应商> / compatible / private model
+```
+
+组态软件团队不需要自己维护 OpenAI、Anthropic、Google 等不同 HTTP 协议，也不需要 Axrail 为每个厂商新增一套 HTTP client。
+
+接入方负责创建具体 Vercel AI SDK LanguageModel，并把它包装为 `AiSdkModelProvider`。API key/token 继续留在供应商 Provider 配置或 Secret Resolver 中，不进入 Axrail ModelDescriptor、Context、Selection、Event。
+
+重要：AI SDK bridge 不给 Tool 配置 execute handler。模型产生的 Tool Call 仍必须返回 Axrail AgentLoop，由 ToolRuntime 执行 Policy / Approval / Audit / Tool effect。
+
+v0.2 运行要求：Node.js >=22.13.0。已经发布的 npm 0.1.0-rc.1 仍然是 Node >=20 的历史版本。

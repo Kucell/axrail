@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.6.5",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "axrail": "tsx packages/cli/src/bin.ts",
