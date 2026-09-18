@@ -1,4 +1,7 @@
-import { ModelRegistry } from "./models.js";
+import {
+  ModelRegistry,
+  type InteractionModelRegistration,
+} from "./models.js";
 import type {
   InteractionAfterTurnHook,
   InteractionBeforeTurnHook,
@@ -184,7 +187,7 @@ export class InteractionPluginHost {
     };
 
     return Object.freeze({
-      registerModel: (registration) => {
+      registerModel: (registration: InteractionModelRegistration) => {
         return remember(this.models.register(registration));
       },
 
