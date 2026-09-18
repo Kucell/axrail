@@ -109,7 +109,7 @@ npm RC 包已经公开。Annotated `v0.1.0-rc.1` Git tag 与 GitHub prerelease �
 
 - **Provider-bound Transactional Mutation** — 高层 `HarnessRuntime.executeChangeSet()`。
 - **Selection Context** — 面向工程编辑器点击/多选/框选的显式 provider-scoped Selection 协议。
-- **`@axrail/interaction-sdk`** — 可选 headless AI 交互核心，提供受限 Context 组合、统一事件和 typed/reversible Interaction Plugin。
+- **`@axrail/interaction-sdk`** — 可选 headless AI 交互核心，提供受限 Context 组合、统一事件、typed/reversible Interaction Plugin，以及 Model Registry / runtime model selection。
 
 Interaction SDK 采用“核心 + 插件”的局部扩展模型，但不会恢复 Axrail-wide generic plugin kernel。Interaction Plugin 通过 SDK 合同不能替换或绕过 ToolRuntime、Policy、Validation、Approval、TransactionRuntime 或 provider-bound execution。
 
@@ -222,6 +222,7 @@ Axrail 的软件 Policy 与 Approval **不能替代** Safety PLC、Interlock、E
 - [RFC-0009: Transactional Mutation Pipeline](rfcs/0009-transactional-mutation/README.md)
 - [RFC-0010: Interactive Selection Context](rfcs/0010-interactive-selection-context/README.md)
 - [RFC-0011: Headless Interaction SDK and Plugin Model](rfcs/0011-interaction-sdk-plugin-model/README.md)
+- [RFC-0012: Model Registry and Runtime Model Selection](rfcs/0012-model-registry-runtime-selection/README.md)
 
 ## Workspace
 
