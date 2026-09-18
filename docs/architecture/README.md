@@ -95,3 +95,10 @@ skill marketplace
 ```
 
 HMI remains the first reference domain, not a generic Harness dependency.
+
+## v0.2 model-provider convergence
+
+- [Model Provider Convergence on Vercel AI SDK](model-provider-ai-sdk-convergence.md) — Node 22.13+ v0.2 baseline and the preferred bridge from Axrail AgentModelProvider to Vercel AI SDK LanguageModel.
+- [RFC-0013 Vercel AI SDK Model Provider Convergence](../../rfcs/0013-ai-sdk-provider-convergence/README.md) — provider-protocol convergence without moving Tool execution or governance into the model SDK.
+
+The post-RC/v0.2 compatibility matrix is Node 22 / 24 / 26. Published npm 0.1.0-rc.1 remains historical Node >=20.
