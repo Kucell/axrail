@@ -38,6 +38,7 @@ Fill in the actual support level used during integration.
 | --- | --- | --- |
 | `hmi.project.artifact` | | |
 | `hmi.project.inspect` | | |
+| `hmi.selection.context` | | |
 | `hmi.screen.create` | | |
 | `hmi.screen.update` | | |
 | `hmi.component.add` | | |
@@ -69,6 +70,30 @@ What was difficult or unclear:
 
 - 
 
+## 4A. Interactive selection / scoped editing
+
+If the product supports canvas-scoped AI editing, complete the product design input first:
+
+- [Product Selection / AI Scoped-Editing Design Input](product-selection-design-input.md)
+- [组态软件 Selection / AI Scoped Editing 接入设计说明模板](product-selection-design-input.zh-CN.md)
+
+Report:
+
+- Click selection supported? Yes / No
+- Multi-selection supported? Yes / No
+- Region/box/lasso selection supported? Yes / No
+- Does hit testing resolve stable engineering component IDs? Yes / No
+- Is the selection snapshot frozen at AI-send time? Yes / No
+- Can a blank region be represented? Yes / No
+- Does the Adapter receive `AdapterContextRequest.selection`? Yes / No
+- Can selected component properties/bindings be normalized without exposing the full private schema? Yes / No
+- Did any selection/request race or stale-selection issue occur?
+- Was `SelectionContext.providerId` easy to map to the Adapter provider?
+- Are region bounds enough for placement/layout intent?
+
+Issues / recommendations:
+
+- 
 ## 5. ChangeSet mutation tested
 
 Describe the first durable mutation.
