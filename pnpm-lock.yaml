@@ -152,6 +152,18 @@ importers:
         specifier: workspace:*
         version: link:../tools
 
+  packages/interaction-sdk:
+    dependencies:
+      '@axrail/adapter-sdk':
+        specifier: workspace:*
+        version: link:../adapter-sdk
+      '@axrail/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@axrail/harness':
+        specifier: workspace:*
+        version: link:../harness
+
   packages/mcp:
     dependencies:
       '@axrail/tools':
