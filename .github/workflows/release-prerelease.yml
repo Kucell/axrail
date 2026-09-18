@@ -171,22 +171,39 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
-      - name: Verify all packages and next tags
+      - name: Verify all packages and next tags with registry propagation retry
         shell: bash
         run: |
           set -euo pipefail
           read -ra packages <<< "$RELEASE_PACKAGES"
 
+          verify_package() {
+            local package="$1"
+            local spec="@axrail/${package}@${RELEASE_VERSION}"
+            local attempts=12
+            local delay=5
+
+            for attempt in $(seq 1 "$attempts"); do
+              actual="$(npm view "$spec" version --json 2>/dev/null | tr -d '"' || true)"
+              next_tag="$(npm view "@axrail/${package}" dist-tags.next 2>/dev/null || true)"
+
+              if [[ "$actual" == "$RELEASE_VERSION" && "$next_tag" == "$RELEASE_VERSION" ]]; then
+                echo "registry ok: $spec (next) [attempt $attempt]"
+                return 0
+              fi
+
+              echo "registry not propagated yet: $spec actual=${actual:-missing} next=${next_tag:-missing} attempt=$attempt/$attempts"
+              if [[ "$attempt" -lt "$attempts" ]]; then
+                sleep "$delay"
+              fi
+            done
+
+            echo "registry verification failed after retries: $spec" >&2
+            return 1
+          }
+
           for package in "${packages[@]}"; do
-            spec="@axrail/${package}@${RELEASE_VERSION}"
-            actual="$(npm view "$spec" version --json | tr -d '"')"
-            test "$actual" = "$RELEASE_VERSION"
-
-            next_tag="$(npm view "@axrail/${package}" dist-tags.next)"
-            test "$next_tag" = "$RELEASE_VERSION"
-
-            echo "registry ok: $spec (next)"
+            verify_package "$package"
           done
 
   finalize:
