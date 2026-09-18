@@ -50,6 +50,15 @@ function turnContext(): InteractionTurnContext {
   return {
     interactionId: "int-test",
     providerId: "vendor-hmi",
+    model: {
+      id: "test-model",
+      providerId: "test-provider",
+    },
+    modelProvenance: {
+      modelId: "test-model",
+      modelProviderId: "test-provider",
+      runtimeProviderId: "runtime-test-model",
+    },
     purpose: "test",
     artifactIds: [],
     includeSensitiveContext: false,
@@ -111,6 +120,11 @@ test("InteractionPluginHost mounts reversible extensions and unmounts before cle
   await host.runAfterTurn(context, {
     interactionId: "int-test",
     providerId: "vendor-hmi",
+    model: {
+      modelId: "test-model",
+      modelProviderId: "test-provider",
+      runtimeProviderId: "runtime-test-model",
+    },
     status: "completed",
     sessionId: "session",
     agent: {
@@ -251,6 +265,11 @@ test("InteractionPluginHost isolates after-turn and event observer failures", as
   await host.runAfterTurn(turnContext(), {
     interactionId: "int",
     providerId: "vendor-hmi",
+    model: {
+      modelId: "test-model",
+      modelProviderId: "test-provider",
+      runtimeProviderId: "runtime-test-model",
+    },
     status: "completed",
     sessionId: "session",
     agent: {
@@ -351,6 +370,9 @@ test("InteractionRuntime composes selection, Adapter Context and plugin Context 
         assert.doesNotMatch(system?.content ?? "", /secret-plugin-context/);
         assert.equal(request.metadata?.interactionId, "int-fixed");
         assert.equal(request.metadata?.interactionProviderId, "vendor-hmi");
+        assert.equal(request.metadata?.interactionModelId, "model");
+        assert.equal(request.metadata?.interactionModelProviderId, "model");
+        assert.equal(request.metadata?.interactionModelRuntimeProviderId, "model");
         return { content: "done", stopReason: "completed" };
       },
     },
@@ -420,6 +442,11 @@ test("InteractionRuntime composes selection, Adapter Context and plugin Context 
 
   assert.equal(result.interactionId, "int-fixed");
   assert.equal(result.status, "completed");
+  assert.deepEqual(result.model, {
+    modelId: "model",
+    modelProviderId: "model",
+    runtimeProviderId: "model",
+  });
   assert.equal(result.agent.content, "done");
   assert.equal(result.context.fragmentCount, 3);
   assert.equal(modelCalls, 1);
