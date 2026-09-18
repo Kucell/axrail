@@ -777,3 +777,101 @@ commit / rollback / audit
 ```
 
 Once that path is reliable across more than one engineering domain, broader ecosystem work becomes justified.
+
+
+## 20. Interactive selection and scoped engineering editing
+
+AI-native engineering editors frequently need an interaction loop where the user selects one or more objects on the canvas and then continues editing through natural language.
+
+Axrail supports this without becoming an editor framework.
+
+```text
+Editor-owned interaction
+click / multi / region / hit test
+              ↓
+stable engineering target IDs
+              ↓
+explicit SelectionContext
+              ↓
+Adapter Context / model-turn assembly
+              ↓
+Change Proposal / ChangeSet
+              ↓
+Policy / Validation / Approval
+              ↓
+Transaction
+              ↓
+provider-bound effect
+```
+
+The authoritative boundary is:
+
+```text
+Product owns:
+  canvas
+  hit testing
+  selection overlays
+  drag / resize
+  zoom / transforms
+  current UI selection state
+
+Axrail owns:
+  explicit selection snapshot contract
+  provider and target provenance
+  HMI selection normalization
+  scoped Context transport
+  governed mutation after ChangeSet creation
+```
+
+### Selection is explicit and request-scoped
+
+`AdapterContextRequest` may carry a `SelectionContext` snapshot for the current request.
+
+Axrail does not keep a hidden mutable global selection inside `HarnessRuntime`. The embedding product freezes the current editor selection when the AI request is created and passes that snapshot explicitly.
+
+This reduces stale-selection and UI/request race ambiguity.
+
+### Stable target identity beats pixel geometry
+
+Region coordinates are useful evidence for layout reasoning and placement, but the HMI product performs hit testing and resolves existing engineering objects to stable IDs before passing them to Axrail.
+
+Axrail must not infer durable engineering targets from pixels.
+
+### Selection does not bypass governance
+
+A selection narrows user intent. It is not approval, authorization, or a durable mutation.
+
+Persistent changes still follow:
+
+```text
+Selection + user request
+      ↓
+ChangeSet
+      ↓
+Policy / Validation / Approval
+      ↓
+Transaction
+      ↓
+ProviderBoundTransactionExecutor
+```
+
+### HMI domain support
+
+`@axrail/hmi-adapter-kit` provides the `hmi.selection.context` capability and helpers for:
+
+- screen selection;
+- single component selection;
+- multi-component selection;
+- region selection with resolved component IDs;
+- blank-region selection for placement intent;
+- normalized selection Context fragments.
+
+See RFC-0010 and `docs/architecture/interactive-selection-scoped-editing.md`.
+
+### Current Context Assembly limitation
+
+Adapter Context retrieval is explicit. Current Harness/Agent does not automatically inject arbitrary Adapter Context into model prompts.
+
+For the first real HMI integration, the embedding AI chat application should retrieve/normalize the current selection context and explicitly include the resulting fragments in the model turn.
+
+A future Context Assembly layer can standardize provenance, sensitivity and budget-aware model input without changing the selection ownership boundary.
