@@ -306,3 +306,31 @@ Vercel AI SDK 只负责模型 Provider 基础设施，不替代 Axrail AgentLoop
 参见 [Model Provider Convergence on Vercel AI SDK](docs/architecture/model-provider-ai-sdk-convergence.md) 和 [RFC-0013](rfcs/0013-ai-sdk-provider-convergence/README.md)。
 
 已经发布的 npm `0.1.0-rc.1` 仍然是 Node >=20、15 package 的历史版本，不被 v0.2 这次调整追溯修改。
+
+## 当前 npm 接入基线
+
+真实 HMI / 组态产品接入请使用已经发布的 prerelease：
+
+```text
+Axrail 0.2.0-alpha.1
+npm dist-tag: next
+Node.js >=22.13.0
+17 个 public packages
+```
+
+相对 RC1 新增的 package 是 `@axrail/interaction-sdk` 和 `@axrail/model-ai-sdk`，但本次不是只发布这两个包；全部 17 个 public package 都已经发布 `0.2.0-alpha.1`。
+
+npm 包页面仍可能默认显示 `0.1.0-rc.1`，因为 alpha 使用 `next`，并没有移动 `latest`，也没有覆盖原来的 `rc` tag。
+
+组态产品推荐固定安装：
+
+```bash
+pnpm add \
+  @axrail/harness@0.2.0-alpha.1 \
+  @axrail/interaction-sdk@0.2.0-alpha.1 \
+  @axrail/model-ai-sdk@0.2.0-alpha.1 \
+  @axrail/hmi-adapter-kit@0.2.0-alpha.1 \
+  @axrail/adapter-sdk@0.2.0-alpha.1
+```
+
+npm dist-tag 验证、模型 Provider 安装和完整接入边界请看 [AI-native HMI / 组态产品接入指南](docs/integrations/ai-native-hmi/README.zh-CN.md)。
