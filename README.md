@@ -278,3 +278,29 @@ RC1 operational closeout continues in parallel: configure stage-only Trusted Pub
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## v0.2 runtime and model-provider direction
+
+Post-RC/v0.2 development raises the minimum runtime to **Node.js 22.13+** and changes the CI compatibility matrix to Node 22 / 24 / 26.
+
+For model vendors, the preferred path is now:
+
+```text
+@axrail/interaction-sdk ModelRegistry
+        ↓
+AgentModelProvider
+        ▲
+@axrail/model-ai-sdk
+        ↓
+Vercel AI SDK
+        ↓
+provider package / private LanguageModel
+```
+
+This keeps Axrail focused on governed engineering execution instead of maintaining vendor HTTP protocols. Vercel AI SDK is provider infrastructure only; Axrail AgentLoop/ToolRuntime remains authoritative and AI SDK Tool definitions are not given execute handlers.
+
+`@axrail/model-openai-compatible` remains as a lightweight/reference compatibility path.
+
+See [Model Provider Convergence on Vercel AI SDK](docs/architecture/model-provider-ai-sdk-convergence.md) and [RFC-0013](rfcs/0013-ai-sdk-provider-convergence/README.md).
+
+The published npm `0.1.0-rc.1` remains the historical Node >=20, 15-package release and is not retroactively changed by this v0.2 work.
