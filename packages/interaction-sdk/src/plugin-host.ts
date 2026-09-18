@@ -16,7 +16,7 @@ import type {
 interface MountedPluginRecord {
   readonly plugin: InteractionPlugin;
   readonly registrations: readonly (() => void)[];
-  readonly cleanup?: () => void;
+  readonly cleanup?: () => Promise<void> | void;
 }
 
 interface HookRecord<T> {
