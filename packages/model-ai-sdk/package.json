@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@axrail/agent": "workspace:*",
-    "ai": "^7.0.0"
+    "ai": "^7.0.0",
+    "@types/json-schema": "^7.0.15"
   }
 }
