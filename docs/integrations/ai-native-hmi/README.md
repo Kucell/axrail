@@ -777,3 +777,37 @@ Plugins may extend context and observe turn/events, but cannot bypass Policy, Va
 The first implementation is turn-oriented. Persisted multi-turn continuation is intentionally not frozen yet; it should later converge on authoritative Harness Session/Event semantics rather than create a competing transcript truth.
 
 See `docs/architecture/interaction-sdk-plugin-architecture.md` and RFC-0011.
+
+
+## 26. Model integration and switching
+
+Do not put model selection in the HMI Adapter or Harness.
+
+Use:
+
+```text
+Product Model Picker
+      ↓ modelId
+@axrail/interaction-sdk
+  ModelRegistry
+  capability checks
+  provenance
+      ↓
+AgentModelProvider
+      ↑
+@axrail/model-* / private provider
+      ↓
+@axrail/agent
+      ↓
+@axrail/harness
+```
+
+Build the UI picker from `interaction.models.list()` and pass `modelId` explicitly on each turn.
+
+Applications may persist user preference outside InteractionRuntime. Avoid shared mutable global model state.
+
+Use `requiredModelCapabilities` when a turn requires capabilities such as tool calling, reasoning or vision; missing/unknown support fails closed before model execution.
+
+Model credentials remain inside concrete providers and are not copied into descriptors, Context, Selection or events.
+
+See RFC-0012 and `docs/architecture/model-registry-runtime-selection.md`.
