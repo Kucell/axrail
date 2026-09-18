@@ -33,6 +33,36 @@ e4758656c20f6cb90b05eb3429c79010667a2f7d
 
 The npm publication is complete. RC1 is not fully finalized until the exact source commit is tagged as `v0.1.0-rc.1` and the GitHub prerelease is created by the protected finalization workflow.
 
+## v0.2.0-alpha.1 integration baseline — PUBLISHED
+
+The current npm baseline for real HMI / engineering-product integration is fully published:
+
+```text
+version:        0.2.0-alpha.1
+npm dist-tag:   next
+runtime:        Node.js >=22.13.0
+public packages: 17
+Git tag:        v0.2.0-alpha.1
+publish source: f1a73bf5522ebf6298cbd6bcd7b8f4d65b3d02bc
+```
+
+The release includes all 17 public packages, not only the two packages introduced after RC1. The new packages relative to `0.1.0-rc.1` are `@axrail/interaction-sdk` and `@axrail/model-ai-sdk`; the prior 15 public packages were also published at `0.2.0-alpha.1`.
+
+The alpha uses the `next` dist-tag. It intentionally does not move `latest` and does not overwrite the historical `rc` tag, so npm package pages may still display `0.1.0-rc.1` as the default visible version.
+
+Verify exact publication with commands such as:
+
+```bash
+npm view @axrail/harness@0.2.0-alpha.1 version
+npm view @axrail/interaction-sdk@0.2.0-alpha.1 version
+npm view @axrail/model-ai-sdk@0.2.0-alpha.1 version
+npm view @axrail/harness dist-tags
+```
+
+Product integrations should pin exact versions rather than depend only on `@next`.
+
+See [v0.2.0-alpha.1 release notes](notes/v0.2.0-alpha.1.md) and the [AI-native HMI Integration Guide](../integrations/ai-native-hmi/README.md).
+
 ## Release documents
 
 - [`v0.1-readiness.md`](v0.1-readiness.md) — current release-readiness state and remaining RC1 closeout.
