@@ -89,7 +89,7 @@ export class InteractionPluginHost {
   }
 
   has(pluginId: string): boolean {
-    return this.mounted.has(pluginId);
+    return this.mounted.has(requiredId(pluginId, "Interaction plugin id"));
   }
 
   list(): readonly MountedInteractionPlugin[] {
