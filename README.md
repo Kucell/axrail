@@ -109,7 +109,7 @@ Current `main` contains experimental/pre-stable work that is **newer than the pu
 
 - **Provider-bound Transactional Mutation** — high-level `HarnessRuntime.executeChangeSet()`.
 - **Selection Context** — explicit provider-scoped click/multi/region selection contracts for engineering editors.
-- **`@axrail/interaction-sdk`** — optional headless AI interaction core with bounded Context composition, normalized events, and typed/reversible Interaction Plugins.
+- **`@axrail/interaction-sdk`** — optional headless AI interaction core with bounded Context composition, normalized events, typed/reversible Interaction Plugins, and Model Registry / runtime model selection.
 
 `@axrail/interaction-sdk` follows a scoped Core + Plugin design inspired by small-core extensibility patterns, while Axrail governance remains non-overridable: Interaction Plugins cannot replace ToolRuntime, Policy, Validation, Approval, TransactionRuntime or provider-bound execution through the SDK contract.
 
@@ -222,6 +222,7 @@ Physical and safety-critical actions must remain constrained by deterministic co
 - [RFC-0009: Transactional Mutation Pipeline](rfcs/0009-transactional-mutation/README.md)
 - [RFC-0010: Interactive Selection Context](rfcs/0010-interactive-selection-context/README.md)
 - [RFC-0011: Headless Interaction SDK and Plugin Model](rfcs/0011-interaction-sdk-plugin-model/README.md)
+- [RFC-0012: Model Registry and Runtime Model Selection](rfcs/0012-model-registry-runtime-selection/README.md)
 
 ## Workspace
 
