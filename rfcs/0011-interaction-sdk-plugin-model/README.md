@@ -83,10 +83,11 @@ Adapter
 
 Plugins receive a narrow registration API.
 
-They cannot obtain privileged mutation services through the SDK contract.
+They can register intent-side model providers, but cannot obtain privileged mutation services through the SDK contract.
 
-Supported first-version registrations:
+Supported interaction registrations now include:
 
+- model provider registration;
 - context contributor;
 - before-turn hook;
 - after-turn hook;
@@ -235,3 +236,10 @@ Acceptance requires:
 - event observer isolation;
 - Node 20/22/24 compatibility;
 - global line/function/branch coverage >=95%.
+
+
+## 17. Model registry follow-on
+
+RFC-0012 extends this Interaction Plugin model with reversible `registerModel()` support plus explicit per-turn model selection, capability validation and model provenance.
+
+This does not expand plugin authority over governed engineering execution.
