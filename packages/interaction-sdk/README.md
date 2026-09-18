@@ -367,3 +367,21 @@ interaction.models.register({
 ```
 
 The embedding product owns provider-package installation and credentials. Axrail does not require Vercel AI Gateway. The bridge performs one model step and does not execute engineering Tools itself.
+
+## Published integration baseline
+
+For real product integration, pin the published prerelease:
+
+```bash
+pnpm add @axrail/interaction-sdk@0.2.0-alpha.1
+```
+
+The npm prerelease uses the `next` dist-tag. An npm package page may still show `0.1.0-rc.1` as its default visible version because `latest` / `rc` were intentionally not moved.
+
+Verify the exact package directly:
+
+```bash
+npm view @axrail/interaction-sdk@0.2.0-alpha.1 version
+```
+
+Use the exact `0.2.0-alpha.1` version in HMI integration repositories so later prereleases cannot silently change the resolved Axrail baseline.
