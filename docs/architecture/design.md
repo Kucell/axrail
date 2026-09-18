@@ -934,3 +934,66 @@ governance replaceability
 ```
 
 See `docs/architecture/interaction-sdk-plugin-architecture.md` and RFC-0011.
+
+
+## 22. Model registry and runtime model selection
+
+Model integration remains layered:
+
+```text
+Third-party UI / Model Picker
+          ↓
+@axrail/interaction-sdk
+  ModelRegistry
+  explicit modelId per turn
+  capability validation
+  model provenance
+          ↓
+AgentModelProvider
+          ↑
+@axrail/model-* / third-party provider
+          ↓
+@axrail/agent
+          ↓
+@axrail/harness
+          ↓
+governed engineering execution
+```
+
+The ownership boundary is:
+
+```text
+@axrail/agent
+  defines model-neutral request/response/provider protocol
+
+@axrail/model-*
+  implements concrete provider transport and credential resolution
+
+@axrail/interaction-sdk
+  registers/lists/selects models
+  validates required capabilities
+  emits model provenance
+
+@axrail/harness
+  remains model-agnostic
+```
+
+The first model-selection contract is deterministic:
+
+```text
+explicit send.modelId
+      ↓
+constructor defaultModelId
+      ↓
+single registered model
+      ↓
+otherwise fail closed
+```
+
+There is no silent fallback and no mutable global user model state.
+
+Model identity is provenance only. It cannot lower Tool risk, bypass Approval, replace Policy/Validation, or alter provider-bound engineering effect identity.
+
+Public model descriptors intentionally contain no credentials. API keys/tokens remain inside concrete model-provider configuration/resolvers.
+
+See `docs/architecture/model-registry-runtime-selection.md` and RFC-0012.
