@@ -5,7 +5,8 @@ Axrail separates Agent intent from governed execution. Durable engineering chang
 ## Documents
 
 - [Architecture and Design](design.md) — current implemented composition model, execution boundaries, package architecture, Adapter/MCP/HMI boundaries, Transactional Mutation direction, and updated roadmap.
-- [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — convergence path from governed Tool intent to ChangeSet + Transaction execution.\n- [Interactive Selection and Scoped HMI Editing](interactive-selection-scoped-editing.md) — product-owned canvas interaction with explicit Axrail Selection Context and governed scoped editing.\n- [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — vendor-neutral selection snapshot and HMI scoped-editing boundary.
+- [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — convergence path from governed Tool intent to ChangeSet + Transaction execution.\n- [Interactive Selection and Scoped HMI Editing](interactive-selection-scoped-editing.md) — product-owned canvas interaction with explicit Axrail Selection Context and governed scoped editing.
+- [Interaction SDK Core + Plugin Architecture](interaction-sdk-plugin-architecture.md) — headless product-facing interaction core with typed, reversible plugins above Harness governance.\n- [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — vendor-neutral selection snapshot and HMI scoped-editing boundary.
 
 ## Current runtime model
 
@@ -61,6 +62,7 @@ For durable L2/L3 engineering mutations, the roadmap direction is to make Change
 7. [RFC-0007 Policy & Approval Model](../../rfcs/0007-policy-approval-model/README.md)
 8. [RFC-0008 Event & Session Model](../../rfcs/0008-event-session-model/README.md)
 9. [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — current post-RC transactional mutation foundation.\n10. [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — explicit provider-scoped selection snapshots for scoped engineering editing.
+11. [RFC-0011 Headless Interaction SDK and Plugin Model](../../rfcs/0011-interaction-sdk-plugin-model/README.md) — reusable AI interaction core with a constrained plugin extension surface.
 
 ## Current architecture workstream
 
