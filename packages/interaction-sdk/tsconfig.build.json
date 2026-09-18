@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "../../.tsbuild/interaction-sdk.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../adapter-sdk/tsconfig.build.json"
+    },
+    {
+      "path": "../agent/tsconfig.build.json"
+    },
+    {
+      "path": "../harness/tsconfig.build.json"
+    }
+  ]
+}
