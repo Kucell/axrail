@@ -271,6 +271,9 @@ Integration layer
 Domain / composition layer
   hmi-adapter-kit
   harness
+
+Optional product interaction layer
+  interaction-sdk
 ```
 
 ### `@axrail/harness`
@@ -300,6 +303,12 @@ MCP interoperability. MCP Tools are normalized into Axrail Tool governance and d
 ### `@axrail/hmi-adapter-kit`
 
 Optional vendor-neutral HMI domain SDK built above generic Axrail packages. It must not become a dependency of the generic Harness runtime.
+
+### `@axrail/interaction-sdk`
+
+Post-RC optional headless product-facing interaction layer above Harness. It owns interaction-turn preparation, explicit Selection/Adapter Context composition, bounded context envelopes, UI-facing event normalization and an interaction-scoped typed plugin host.
+
+It is intentionally **not** a new Axrail-wide plugin kernel. Interaction plugins cannot replace or bypass ToolRuntime, Policy, Validation, Approval, ChangeSet, TransactionRuntime, provider-bound execution or authoritative audit boundaries.
 
 ### `@axrail/core`
 
@@ -875,3 +884,53 @@ Adapter Context retrieval is explicit. Current Harness/Agent does not automatica
 For the first real HMI integration, the embedding AI chat application should retrieve/normalize the current selection context and explicitly include the resulting fragments in the model turn.
 
 A future Context Assembly layer can standardize provenance, sensitivity and budget-aware model input without changing the selection ownership boundary.
+
+
+## 21. Headless interaction core and plugin extensions
+
+Third-party engineering applications should not independently rebuild the same AI chat/context/selection glue.
+
+Axrail therefore adds an optional product-facing layer:
+
+```text
+Third-party UI
+  AI Chat / Canvas
+        ↓
+@axrail/interaction-sdk
+  InteractionRuntime
+  InteractionPluginHost
+        ↓
+@axrail/harness
+        ↓
+Agent / governed Tool / ChangeSet / Transaction
+        ↓
+Adapter
+```
+
+The interaction layer follows a constrained core + plugin model:
+
+```text
+Fixed Interaction Core
+├─ turn lifecycle
+├─ explicit selection
+├─ Adapter Context
+├─ context budget
+├─ Harness Agent invocation
+└─ normalized events
+
+Typed Interaction Plugins
+├─ context contributor
+├─ before-turn hook
+├─ after-turn observer
+└─ event observer
+```
+
+The important invariant is:
+
+```text
+Interaction extensibility
+        ≠
+governance replaceability
+```
+
+See `docs/architecture/interaction-sdk-plugin-architecture.md` and RFC-0011.
