@@ -108,6 +108,7 @@ ProviderBoundTransactionExecutor
 
 ```text
 @axrail/harness
+@axrail/interaction-sdk   # post-RC，可选，统一 AI 对话/Context/Selection/Plugin 交互层
 @axrail/adapter-sdk
 @axrail/hmi-adapter-kit
 @axrail/artifacts
@@ -807,3 +808,42 @@ const fragments = await harness.adapters.buildContext(
 设计说明的目的不是要求公开私有 schema，而是让 Axrail Adapter 能够正确确定 `UI selection → stable engineering scope → normalized Context → ChangeSet → 真实产品 mutation API`。
 
 相关协议：RFC-0010 — Interactive Selection Context；`docs/architecture/interactive-selection-scoped-editing.md`。
+
+
+## 25. 推荐使用 Interaction SDK 封装 AI 对话核心
+
+多个第三方组态软件接入时，不建议每一家重新实现 AI Chat → Context → Selection → Agent 的 glue code。
+
+post-RC Axrail 提供：
+
+```text
+@axrail/interaction-sdk
+```
+
+推荐结构：
+
+```text
+第三方现有 AI Chat UI / Canvas
+          ↓
+InteractionRuntime
+          ├─ Selection snapshot
+          ├─ Adapter Context
+          ├─ Plugin Context
+          ├─ bounded context envelope
+          └─ normalized events
+          ↓
+HarnessRuntime
+          ↓
+Agent / ChangeSet / Transaction
+          ↓
+HMI Adapter
+```
+
+第三方可以通过 `InteractionPlugin` 扩展 Context、turn hook 和 UI event observer，但插件不能绕过 Policy、Validation、Approval、Transaction 或 provider-bound executor。
+
+当前第一版是 **turn-oriented**。持久化多轮 conversation continuation 尚未冻结，不要在接入方私有实现中另造一套与 Harness Session 冲突的权威会话模型。
+
+详见：
+
+- `docs/architecture/interaction-sdk-plugin-architecture.md`
+- RFC-0011
