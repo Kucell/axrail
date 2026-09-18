@@ -5,7 +5,7 @@ Axrail separates Agent intent from governed execution. Durable engineering chang
 ## Documents
 
 - [Architecture and Design](design.md) — current implemented composition model, execution boundaries, package architecture, Adapter/MCP/HMI boundaries, Transactional Mutation direction, and updated roadmap.
-- [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — convergence path from governed Tool intent to ChangeSet + Transaction execution.
+- [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — convergence path from governed Tool intent to ChangeSet + Transaction execution.\n- [Interactive Selection and Scoped HMI Editing](interactive-selection-scoped-editing.md) — product-owned canvas interaction with explicit Axrail Selection Context and governed scoped editing.\n- [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — vendor-neutral selection snapshot and HMI scoped-editing boundary.
 
 ## Current runtime model
 
@@ -60,7 +60,7 @@ For durable L2/L3 engineering mutations, the roadmap direction is to make Change
 6. [RFC-0006 Adapter Protocol](../../rfcs/0006-adapter-protocol/README.md) — implemented foundation; advanced transaction semantics under convergence.
 7. [RFC-0007 Policy & Approval Model](../../rfcs/0007-policy-approval-model/README.md)
 8. [RFC-0008 Event & Session Model](../../rfcs/0008-event-session-model/README.md)
-9. [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — current post-RC architecture workstream.
+9. [RFC-0009 Transactional Mutation Pipeline](../../rfcs/0009-transactional-mutation/README.md) — current post-RC transactional mutation foundation.\n10. [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — explicit provider-scoped selection snapshots for scoped engineering editing.
 
 ## Current architecture workstream
 
@@ -70,7 +70,7 @@ Recommended order:
 
 1. **Architecture Convergence** — keep Harness/AdapterHost as the real composition model; keep `@axrail/core` experimental; align RFCs and docs.
 2. **Transactional Mutation** — connect governed Tool/change proposals to ChangeSet + Transaction through a high-level Harness path.
-3. **Real HMI Adapter** — validate executor selection, preview, Validation, Policy, Approval, commit/rollback and Context semantics with a real AI-native HMI integration.
+3. **HMI interaction readiness + Real HMI Adapter** — standardize explicit Selection Context/scoped editing first, then validate executor selection, preview, Validation, Policy, Approval, commit/rollback and Context semantics with a real AI-native HMI integration.
 4. **Engineering Runtime** — add Context Assembly, engineering Skills, durable EventStore providers and recovery/resume semantics after the mutation path is proven.
 5. **Second Adapter validation** — use a substantially different engineering integration to ensure the protocol is not HMI-specific.
 6. **v0.2 stabilization** — freeze the next Adapter, transactional mutation, Context and Harness high-level execution contracts.
