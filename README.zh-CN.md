@@ -278,3 +278,31 @@ RC1 运维收口并行进行：为后续发布配置 stage-only Trusted Publishe
 ## License
 
 Apache-2.0。参见 [LICENSE](LICENSE)。
+
+## v0.2 运行时与模型 Provider 方向
+
+post-RC/v0.2 开发基线提升为 **Node.js 22.13+**，CI 兼容矩阵调整为 Node 22 / 24 / 26。
+
+后续模型供应商推荐统一走：
+
+```text
+@axrail/interaction-sdk ModelRegistry
+        ↓
+AgentModelProvider
+        ▲
+@axrail/model-ai-sdk
+        ↓
+Vercel AI SDK
+        ↓
+供应商 Provider / 私有 LanguageModel
+```
+
+这样 Axrail 不再为 OpenAI、Anthropic、Google 等模型分别维护 HTTP 请求协议，而专注于工程 Tool 治理、ChangeSet、Transaction、Policy、Approval 与 Adapter。
+
+Vercel AI SDK 只负责模型 Provider 基础设施，不替代 Axrail AgentLoop/ToolRuntime；桥接层不会给 AI SDK Tool 定义 execute handler。
+
+`@axrail/model-openai-compatible` 暂时保留为轻量/reference compatibility 路径。
+
+参见 [Model Provider Convergence on Vercel AI SDK](docs/architecture/model-provider-ai-sdk-convergence.md) 和 [RFC-0013](rfcs/0013-ai-sdk-provider-convergence/README.md)。
+
+已经发布的 npm `0.1.0-rc.1` 仍然是 Node >=20、15 package 的历史版本，不被 v0.2 这次调整追溯修改。
