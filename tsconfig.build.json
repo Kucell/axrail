@@ -45,6 +45,9 @@
     },
     {
       "path": "./packages/harness/tsconfig.build.json"
+    },
+    {
+      "path": "./packages/interaction-sdk/tsconfig.build.json"
     }
   ]
 }
