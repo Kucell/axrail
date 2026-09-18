@@ -184,6 +184,7 @@ HMI kit 当前标准 capability：
 ```text
 hmi.project.artifact
 hmi.project.inspect
+hmi.selection.context
 hmi.screen.create
 hmi.screen.update
 hmi.component.add
@@ -723,3 +724,86 @@ Policy
 - RFC-0009 — Transactional Mutation Pipeline。
 
 真实 HMI 的第一次接入就是用来挑战这些协议的。当前 post-RC 高层 API 仍然是 pre-stable；接入方发现问题后，应优先把问题和建议返回，而不是为了适配当前 API 在私有产品里堆大量不可维护的 workaround。
+## 23. 画布选择 / 框选与 AI Scoped Editing
+
+如果产品只有一个 AI 对话框，也可以实现类似 OpenDesign 的“画面选中 / 框选 → 继续通过自然语言修改”的体验。
+
+```text
+组态软件负责
+Canvas / Editor
+点击 / 多选 / 框选 / hit testing
+稳定 screen/component ID
+          ↓
+SelectionContext snapshot
+          ↓
+Axrail Adapter Context
+          ↓
+AI 对话请求
+          ↓
+ChangeSet
+          ↓
+Policy / Validation / Approval
+          ↓
+Transaction
+          ↓
+HMI Adapter
+```
+
+Axrail 不负责鼠标框选 UI、Canvas renderer、hit testing、selection overlay、drag/resize/snap、zoom/pan 或 layer/property panel。这些必须由组态软件实现。
+
+Axrail 负责 `SelectionContext`、provider scope、stable target identity、optional bounds/coordinate-space evidence、`hmi.selection.context` HMI domain contract，以及 Selection 之后的 ChangeSet + Transaction governed mutation。
+
+### 23.1 当前 Selection 必须显式传入
+
+不要在 Harness 里维护隐藏全局 selection。用户点击“发送”时，组态软件应冻结当前 selection snapshot：
+
+```ts
+const selection = hmiRegionSelection({
+  selectionId: "sel:456",
+  providerId: "your-hmi",
+  projectId: "project:123",
+  screenId: "screen:overview",
+  componentIds: ["pump-101", "valve-102"],
+  bounds: {
+    x: 100, y: 60, width: 600, height: 300,
+    coordinateSpace: "screen:overview",
+  },
+});
+```
+
+然后显式获取 Context：
+
+```ts
+const fragments = await harness.adapters.buildContext(
+  {
+    purpose: "scoped-edit",
+    artifactIds: ["project:123"],
+    selection,
+  },
+  { adapterIds: ["your-hmi"], includeSensitive: false },
+);
+```
+
+当前 Axrail 不会自动把任意 Adapter Context 注入模型 prompt。第一版接入时，组态软件的 AI request assembly 需要把这些 normalized fragments 显式加入当前模型请求。
+
+### 23.2 Stable ID 是权威目标
+
+组态软件必须自己完成 `框选矩形 → hit testing → component IDs`。坐标只是上下文 evidence；对于已有对象修改，最终 ChangeSet 必须使用稳定工程对象 ID。
+
+### 23.3 Blank Region
+
+框选空白区域也是合法场景，例如“在这里放一个趋势图”。此时 region selection 可以没有 component target，但必须有 bounds。最终 ChangeSet 应以稳定 screen/project 为 durable target，把 region 作为布局/placement context。
+
+### 23.4 Selection 不是授权
+
+`Selection ≠ Approval ≠ Policy allow ≠ durable mutation`。用户选中了组件，只说明当前意图 scope；真正修改仍然必须经过 `ChangeSet → Policy → Validation → Approval（需要时）→ Transaction`。
+
+## 24. 真实组态软件接入前需要补充的设计说明
+
+在真实产品开始写 Adapter 前，请先填写 [组态软件 Selection / AI Scoped Editing 接入设计说明模板](product-selection-design-input.zh-CN.md)。
+
+至少要说明：AI 对话框调用入口、Canvas/renderer 架构、单选/多选/框选、hit testing、stable project/screen/component ID、selection event、coordinate system/zoom/transform、selected component properties/bindings 查询 API、project revision/version、preview/apply/verify/save/commit、undo/rollback/compensation，以及 iframe/WebView/Native/thread boundary。
+
+设计说明的目的不是要求公开私有 schema，而是让 Axrail Adapter 能够正确确定 `UI selection → stable engineering scope → normalized Context → ChangeSet → 真实产品 mutation API`。
+
+相关协议：RFC-0010 — Interactive Selection Context；`docs/architecture/interactive-selection-scoped-editing.md`。
