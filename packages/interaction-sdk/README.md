@@ -340,3 +340,30 @@ runtimeProviderId
 This is provenance, not Approval/Policy authority.
 
 See `docs/architecture/model-registry-runtime-selection.md` and RFC-0012.
+
+## Preferred multi-provider model bridge
+
+For v0.2, use `@axrail/model-ai-sdk` with the Vercel AI SDK provider ecosystem instead of adding a hand-written Axrail HTTP client for every model vendor.
+
+```ts
+import { AiSdkModelProvider } from "@axrail/model-ai-sdk";
+// import the Vercel AI SDK provider package your product actually uses.
+
+const provider = new AiSdkModelProvider({
+  id: "engineering-model-runtime",
+  model: vendorLanguageModel,
+});
+
+interaction.models.register({
+  descriptor: {
+    id: "engineering-model",
+    providerId: "vendor",
+    capabilities: {
+      toolCalling: true,
+    },
+  },
+  provider,
+});
+```
+
+The embedding product owns provider-package installation and credentials. Axrail does not require Vercel AI Gateway. The bridge performs one model step and does not execute engineering Tools itself.
