@@ -4,10 +4,18 @@ import test from "node:test";
 import {
   HMI_CAPABILITIES,
   HMI_PROJECT_ARTIFACT_TYPE,
+  HMI_SELECTION_CONTEXT_KIND,
+  HMI_SCREEN_TARGET_TYPE,
+  HMI_COMPONENT_TARGET_TYPE,
   createHmiCapabilityManifest,
   createHmiTools,
   exactHmiCapabilities,
   hmiProjectRef,
+  hmiComponentSelection,
+  hmiMultiComponentSelection,
+  hmiRegionSelection,
+  hmiScreenSelection,
+  hmiSelectionContextFragment,
   isHmiProjectArtifact,
 } from "../packages/hmi-adapter-kit/src/index.ts";
 
@@ -129,4 +137,150 @@ test("HMI tool validators fail closed for malformed scalar and structured input"
   assert.throws(() => byName.get(HMI_CAPABILITIES.BINDING_CREATE)?.validateInput?.({ projectId: "p", screenId: "s", componentId: "c", property: "x", binding: [] }), /binding to be an object/);
   assert.throws(() => byName.get(HMI_CAPABILITIES.PREVIEW)?.validateInput?.({ projectId: "p", screenId: 4 }), /screenId to be a non-empty string/);
   assert.throws(() => byName.get(HMI_CAPABILITIES.DEPLOY)?.validateInput?.({ projectId: "p", target: " " }), /target to be a non-empty string/);
+});
+
+
+test("HMI selection helpers normalize screen, component, multi and region selection", () => {
+  const component = hmiComponentSelection({
+    selectionId: "sel-component",
+    providerId: "hmi",
+    projectId: " project:1 ",
+    screenId: " screen:overview ",
+    componentId: " pump-1 ",
+    bounds: { x: 10, y: 20, width: 100, height: 50 },
+  });
+  assert.equal(component.source, "hmi.canvas");
+  assert.equal(component.projectId, "project:1");
+  assert.equal(component.screenId, "screen:overview");
+  assert.equal(component.mode, "single");
+  assert.deepEqual(component.targets[0], {
+    targetId: "pump-1",
+    targetType: HMI_COMPONENT_TARGET_TYPE,
+    artifactId: "project:1",
+    parentId: "screen:overview",
+    metadata: undefined,
+  });
+
+  const multi = hmiMultiComponentSelection({
+    selectionId: "sel-multi",
+    providerId: "hmi",
+    projectId: "project:1",
+    screenId: "screen:overview",
+    componentIds: ["pump-1", "valve-2"],
+    source: "hmi.layers",
+  });
+  assert.equal(multi.mode, "multiple");
+  assert.equal(multi.source, "hmi.layers");
+  assert.deepEqual(multi.targets.map((target) => target.targetId), ["pump-1", "valve-2"]);
+
+  const region = hmiRegionSelection({
+    selectionId: "sel-region",
+    providerId: "hmi",
+    projectId: "project:1",
+    screenId: "screen:overview",
+    componentIds: ["pump-1", "valve-2"],
+    bounds: {
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      coordinateSpace: "screen:overview",
+    },
+  });
+  assert.equal(region.mode, "region");
+  assert.equal(region.bounds?.coordinateSpace, "screen:overview");
+
+  const blankRegion = hmiRegionSelection({
+    selectionId: "sel-blank-region",
+    providerId: "hmi",
+    projectId: "project:1",
+    screenId: "screen:overview",
+    bounds: { x: 400, y: 100, width: 200, height: 120 },
+  });
+  assert.deepEqual(blankRegion.targets, []);
+
+  const screen = hmiScreenSelection({
+    selectionId: "sel-screen",
+    providerId: "hmi",
+    projectId: "project:1",
+    screenId: "screen:overview",
+  });
+  assert.equal(screen.targets[0]?.targetType, HMI_SCREEN_TARGET_TYPE);
+  assert.equal(screen.targets[0]?.targetId, "screen:overview");
+
+  const fragment = hmiSelectionContextFragment(region);
+  assert.equal(fragment.kind, HMI_SELECTION_CONTEXT_KIND);
+  assert.equal(fragment.providerId, "hmi");
+  assert.equal(fragment.content, region);
+  assert.deepEqual(fragment.metadata, {
+    projectId: "project:1",
+    screenId: "screen:overview",
+    selectionId: "sel-region",
+    mode: "region",
+  });
+});
+
+test("HMI selection helpers fail closed on missing engineering identities", () => {
+  assert.throws(
+    () => hmiComponentSelection({
+      selectionId: "sel",
+      providerId: "hmi",
+      projectId: "",
+      screenId: "screen",
+      componentId: "component",
+    }),
+    /projectId must be a non-empty string/,
+  );
+  assert.throws(
+    () => hmiComponentSelection({
+      selectionId: "sel",
+      providerId: "hmi",
+      projectId: "project",
+      screenId: "",
+      componentId: "component",
+    }),
+    /screenId must be a non-empty string/,
+  );
+  assert.throws(
+    () => hmiComponentSelection({
+      selectionId: "sel",
+      providerId: "hmi",
+      projectId: "project",
+      screenId: "screen",
+      componentId: "",
+    }),
+    /componentId must be a non-empty string/,
+  );
+  assert.throws(
+    () => hmiMultiComponentSelection({
+      selectionId: "sel",
+      providerId: "hmi",
+      projectId: "project",
+      screenId: "screen",
+      componentIds: [],
+    }),
+    /at least one target/,
+  );
+  assert.throws(
+    () => hmiRegionSelection({
+      selectionId: "sel",
+      providerId: "hmi",
+      projectId: "project",
+      screenId: "screen",
+      bounds: { x: 0, y: 0, width: -1, height: 10 },
+    }),
+    /width\/height must not be negative/,
+  );
+});
+
+test("HMI capability manifest exposes selection context as a standard capability", () => {
+  const manifest = createHmiCapabilityManifest({
+    adapterId: "hmi",
+    adapterVersion: "1",
+    support: exactHmiCapabilities(HMI_CAPABILITIES.SELECTION_CONTEXT),
+  });
+  assert.equal(
+    manifest.capabilities[HMI_CAPABILITIES.SELECTION_CONTEXT]?.level,
+    "exact",
+  );
 });
