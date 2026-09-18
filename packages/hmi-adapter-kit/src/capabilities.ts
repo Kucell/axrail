@@ -1,6 +1,7 @@
 export const HMI_CAPABILITIES = {
   PROJECT_ARTIFACT: "hmi.project.artifact",
   PROJECT_INSPECT: "hmi.project.inspect",
+  SELECTION_CONTEXT: "hmi.selection.context",
   SCREEN_CREATE: "hmi.screen.create",
   SCREEN_UPDATE: "hmi.screen.update",
   COMPONENT_ADD: "hmi.component.add",
