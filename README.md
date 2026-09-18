@@ -304,3 +304,31 @@ This keeps Axrail focused on governed engineering execution instead of maintaini
 See [Model Provider Convergence on Vercel AI SDK](docs/architecture/model-provider-ai-sdk-convergence.md) and [RFC-0013](rfcs/0013-ai-sdk-provider-convergence/README.md).
 
 The published npm `0.1.0-rc.1` remains the historical Node >=20, 15-package release and is not retroactively changed by this v0.2 work.
+
+## Current npm integration baseline
+
+For real HMI / engineering-product integration, use the published prerelease:
+
+```text
+Axrail 0.2.0-alpha.1
+npm dist-tag: next
+Node.js >=22.13.0
+17 public packages
+```
+
+The two packages newly introduced after RC1 are `@axrail/interaction-sdk` and `@axrail/model-ai-sdk`, but all 17 public packages are published at `0.2.0-alpha.1`.
+
+An npm package page may still show `0.1.0-rc.1` as its default visible version because the alpha release uses `next` and intentionally does not move `latest` or overwrite `rc`.
+
+Recommended integration install:
+
+```bash
+pnpm add \
+  @axrail/harness@0.2.0-alpha.1 \
+  @axrail/interaction-sdk@0.2.0-alpha.1 \
+  @axrail/model-ai-sdk@0.2.0-alpha.1 \
+  @axrail/hmi-adapter-kit@0.2.0-alpha.1 \
+  @axrail/adapter-sdk@0.2.0-alpha.1
+```
+
+See the [AI-native HMI Integration Guide](docs/integrations/ai-native-hmi/README.md) for npm dist-tag verification, model-provider setup and integration boundaries.

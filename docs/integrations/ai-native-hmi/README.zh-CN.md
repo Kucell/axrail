@@ -926,7 +926,90 @@ v0.2 运行要求：Node.js >=22.13.0。已经发布的 npm 0.1.0-rc.1 仍然是
 
 ## 28. npm 接入基线：0.2.0-alpha.1
 
-真实组态软件接入请固定使用 prerelease 版本，不要直接跟随 GitHub `main`：
+真实组态软件接入请固定使用已经发布的 npm prerelease，不要直接跟随 GitHub `main`。
+
+### 28.1 当前发布状态
+
+当前正式供接入验证使用的 npm 基线是：
+
+```text
+version:   0.2.0-alpha.1
+dist-tag:  next
+runtime:   Node.js >=22.13.0
+packages:  17 个 public @axrail/* packages
+```
+
+本次相对 `0.1.0-rc.1` **新增**的 package 是：
+
+```text
+@axrail/interaction-sdk
+@axrail/model-ai-sdk
+```
+
+但不是只发布这两个包。原有 15 个 public package 也全部同步发布了 `0.2.0-alpha.1`，因此总计 17 个。
+
+`@axrail/core` 仍是 private/experimental，不发布到 npm。
+
+### 28.2 为什么 npm 页面可能仍显示 0.1.0-rc.1
+
+`0.2.0-alpha.1` 使用的是 npm dist-tag：
+
+```text
+next
+```
+
+我们刻意没有把 alpha 版本切到 `latest`，也没有覆盖原来的 `rc` tag。
+
+因此 npm 包页面的默认版本区域仍可能展示：
+
+```text
+0.1.0-rc.1
+```
+
+这不代表 `0.2.0-alpha.1` 没发布。
+
+接入时不要根据 npm 页面顶部显示的默认版本判断是否发布成功，应直接检查精确版本或 `next` tag。
+
+### 28.3 如何验证 npm 版本
+
+例如：
+
+```bash
+npm view @axrail/harness@0.2.0-alpha.1 version
+npm view @axrail/interaction-sdk@0.2.0-alpha.1 version
+npm view @axrail/model-ai-sdk@0.2.0-alpha.1 version
+```
+
+预期都返回：
+
+```text
+0.2.0-alpha.1
+```
+
+检查 dist-tags：
+
+```bash
+npm view @axrail/harness dist-tags
+npm view @axrail/interaction-sdk dist-tags
+```
+
+其中 `next` 应指向：
+
+```text
+0.2.0-alpha.1
+```
+
+如果只想安装当前 prerelease，也可以使用：
+
+```bash
+pnpm add @axrail/interaction-sdk@next
+```
+
+但真实组态产品的集成仓库建议固定精确版本，不要让 `next` 自动漂移。
+
+### 28.4 组态产品推荐安装方式
+
+建议第一轮真实接入固定：
 
 ```bash
 pnpm add \
@@ -937,18 +1020,46 @@ pnpm add \
   @axrail/adapter-sdk@0.2.0-alpha.1
 ```
 
-npm dist-tag 为：
+如果产品直接使用更底层的 Transaction / Agent / Tool API，再按实际需要显式添加对应 package；不要为了“完整”一次性安装全部 17 个包。
 
-```text
-next
+### 28.5 模型 Provider 依赖
+
+`@axrail/model-ai-sdk` 是 Axrail 到 Vercel AI SDK 的 bridge，不会替组态产品自动安装所有模型厂商 Provider。
+
+产品按实际模型供应商安装，例如：
+
+```bash
+pnpm add @ai-sdk/openai
 ```
 
-运行要求：
+或者对应的 Anthropic / Google / compatible / private provider。
+
+API key/token 继续留在模型 Provider / Secret Resolver 内，不进入 Axrail ModelDescriptor、Context、Selection 或 Event。
+
+### 28.6 版本与发布证据
+
+本次 prerelease 的权威发布标识：
 
 ```text
-Node.js >=22.13.0
+npm version:       0.2.0-alpha.1
+npm dist-tag:      next
+Git tag:           v0.2.0-alpha.1
+GitHub prerelease: Axrail 0.2.0-alpha.1
+publish source:    f1a73bf5522ebf6298cbd6bcd7b8f4d65b3d02bc
 ```
 
-组态产品使用的具体模型供应商 package（例如对应的 Vercel AI SDK provider）由产品自己安装和配置，凭据不进入 Axrail 配置/Context/Selection。
+第一轮真实接入、问题反馈、协议修正和兼容性验证，都必须记录所使用的精确 Axrail npm 版本。
 
-第一轮真实接入、反馈和协议修正都应记录所使用的精确 Axrail npm 版本。
+不要只记录：
+
+```text
+@next
+```
+
+应记录：
+
+```text
+0.2.0-alpha.1
+```
+
+这样后续才能准确复现问题和比较 alpha.2 / beta / rc 的行为差异。
