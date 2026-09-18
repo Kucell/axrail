@@ -648,3 +648,338 @@ test("InteractionRuntime before-turn plugin can fail closed before model executi
   );
   assert.equal(modelCalls, 0);
 });
+
+
+test("InteractionPluginHost covers optional contributions, sensitive context and idempotent disposers", async () => {
+  const host = new InteractionPluginHost();
+  let manualDispose: (() => void) | undefined;
+
+  await host.mount({
+    id: " branch-plugin ",
+    setup(api) {
+      manualDispose = api.registerBeforeTurn(() => {});
+      api.registerContextContributor({
+        id: "none",
+        contribute() {
+          return undefined;
+        },
+      });
+      api.registerContextContributor({
+        id: "sensitive",
+        contribute() {
+          return {
+            kind: "secret.context",
+            content: { secret: true },
+            sensitive: true,
+            metadata: { source: "private" },
+          };
+        },
+      });
+    },
+  });
+
+  manualDispose?.();
+  manualDispose?.();
+
+  const hidden = await host.collectContext(turnContext());
+  assert.deepEqual(hidden, []);
+
+  const visible = await host.collectContext({
+    ...turnContext(),
+    includeSensitiveContext: true,
+  });
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0]?.kind, "secret.context");
+  assert.equal(visible[0]?.sensitive, true);
+  assert.deepEqual(visible[0]?.metadata, { source: "private" });
+  assert.equal(Object.isFrozen(visible[0]?.metadata), true);
+
+  assert.equal(host.has(" branch-plugin "), true);
+  assert.equal(await host.unmount(" branch-plugin "), true);
+  assert.equal(host.has("branch-plugin"), false);
+});
+
+test("InteractionPluginHost validates hook/listener inputs and context contribution identity", async () => {
+  const invalidCases: Array<{
+    id: string;
+    pattern: RegExp;
+    setup(api: unknown): void;
+  }> = [
+    {
+      id: "bad-before",
+      pattern: /before-turn hook must be a function/,
+      setup(api) {
+        const typed = api as {
+          registerBeforeTurn(value: unknown): () => void;
+        };
+        typed.registerBeforeTurn(null);
+      },
+    },
+    {
+      id: "bad-after",
+      pattern: /after-turn hook must be a function/,
+      setup(api) {
+        const typed = api as {
+          registerAfterTurn(value: unknown): () => void;
+        };
+        typed.registerAfterTurn("bad");
+      },
+    },
+    {
+      id: "bad-event",
+      pattern: /event listener must be a function/,
+      setup(api) {
+        const typed = api as {
+          onEvent(value: unknown): () => void;
+        };
+        typed.onEvent(123);
+      },
+    },
+  ];
+
+  for (const entry of invalidCases) {
+    const host = new InteractionPluginHost();
+    await assert.rejects(
+      host.mount({
+        id: entry.id,
+        setup(api) {
+          entry.setup(api);
+        },
+      }),
+      entry.pattern,
+    );
+    assert.equal(host.has(entry.id), false);
+  }
+
+  const badContext = new InteractionPluginHost();
+  await badContext.mount({
+    id: "bad-context",
+    setup(api) {
+      api.registerContextContributor({
+        id: "bad-kind",
+        contribute() {
+          return { kind: " ", content: true };
+        },
+      });
+    },
+  });
+  await assert.rejects(
+    badContext.collectContext(turnContext()),
+    /context kind must not be empty/,
+  );
+});
+
+test("InteractionRuntime covers default prompt/context paths and sensitive Adapter Context opt-in", async () => {
+  const harness = new HarnessRuntime();
+  await harness.adapters.mount({
+    ...adapter("sensitive-hmi"),
+    context() {
+      return [
+        {
+          id: "public",
+          async build() {
+            return {
+              providerId: "sensitive-hmi",
+              kind: "public.context",
+              content: { public: true },
+              metadata: { order: 1 },
+            };
+          },
+        },
+        {
+          id: "sensitive",
+          async build() {
+            return {
+              providerId: "sensitive-hmi",
+              kind: "secret.context",
+              content: "adapter-secret",
+              sensitive: true,
+              metadata: { order: 2 },
+            };
+          },
+        },
+      ];
+    },
+  });
+
+  let seenSystem = "";
+  const runtime = new InteractionRuntime({
+    harness,
+    model: {
+      id: "defaults",
+      async complete(request) {
+        seenSystem =
+          request.messages.find((message) => message.role === "system")?.content ?? "";
+        return { content: "ok", stopReason: "completed" };
+      },
+    },
+  });
+
+  assert.throws(
+    () => runtime.subscribe(null as unknown as (event: never) => void),
+    /event listener must be a function/,
+  );
+
+  const events: string[] = [];
+  const unsubscribe = runtime.subscribe((event) => {
+    events.push(event.type);
+  });
+  unsubscribe();
+  unsubscribe();
+
+  const result = await runtime.send({
+    message: "inspect",
+    providerId: "sensitive-hmi",
+    includeSensitiveContext: true,
+    actorId: "operator",
+    metadata: { environment: "design" },
+  });
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.context.fragmentCount, 2);
+  assert.match(seenSystem, /^AXRAIL_INTERACTION_CONTEXT/);
+  assert.match(seenSystem, /public\.context/);
+  assert.match(seenSystem, /secret\.context/);
+  assert.match(seenSystem, /adapter-secret/);
+  assert.match(seenSystem, /\"order\":2/);
+  assert.deepEqual(events, []);
+
+  await runtime.unmount("missing-plugin");
+});
+
+test("InteractionRuntime reports max_steps through the completed interaction path", async () => {
+  const harness = new HarnessRuntime();
+  await harness.adapters.mount(adapter("max-hmi"));
+
+  const terminal: Array<{ type: string; data: unknown }> = [];
+  const runtime = new InteractionRuntime({
+    harness,
+    maxSteps: 1,
+    model: {
+      id: "loops",
+      async complete() {
+        return {
+          toolCalls: [{
+            id: "missing-call",
+            name: "missing.tool",
+            input: {},
+          }],
+          stopReason: "tool_calls",
+        };
+      },
+    },
+  });
+  runtime.subscribe((event) => {
+    if (
+      event.type === "interaction.turn.completed" ||
+      event.type === "interaction.turn.cancelled"
+    ) {
+      terminal.push({ type: event.type, data: event.data });
+    }
+  });
+
+  const result = await runtime.send({
+    message: "keep trying",
+    providerId: "max-hmi",
+  });
+
+  assert.equal(result.status, "max_steps");
+  assert.equal(result.agent.status, "max_steps");
+  assert.equal(terminal.length, 1);
+  assert.equal(terminal[0]?.type, "interaction.turn.completed");
+  assert.match(JSON.stringify(terminal[0]?.data), /max_steps/);
+});
+
+test("InteractionRuntime emits unmounted before propagating plugin cleanup failure", async () => {
+  const harness = new HarnessRuntime();
+  const runtime = new InteractionRuntime({
+    harness,
+    model: {
+      id: "unused",
+      async complete() {
+        return {};
+      },
+    },
+  });
+
+  const events: string[] = [];
+  runtime.subscribe((event) => {
+    events.push(event.type);
+  });
+
+  await runtime.mount({
+    id: " cleanup-runtime ",
+    setup() {
+      return () => {
+        throw new Error("runtime cleanup failed");
+      };
+    },
+  });
+
+  await assert.rejects(
+    runtime.unmount(" cleanup-runtime "),
+    /runtime cleanup failed/,
+  );
+  assert.equal(runtime.plugins.has("cleanup-runtime"), false);
+  assert.ok(events.includes("interaction.plugin.mounted"));
+  assert.ok(events.includes("interaction.plugin.unmounted"));
+
+  await assert.rejects(
+    runtime.unmount(" "),
+    /plugin id must not be empty/i,
+  );
+});
+
+test("InteractionRuntime validates artifact IDs before model execution", async () => {
+  const harness = new HarnessRuntime();
+  await harness.adapters.mount(adapter("artifact-hmi"));
+  let modelCalls = 0;
+  const runtime = new InteractionRuntime({
+    harness,
+    model: {
+      id: "never",
+      async complete() {
+        modelCalls += 1;
+        return {};
+      },
+    },
+  });
+
+  await assert.rejects(
+    runtime.send({
+      message: "inspect",
+      providerId: "artifact-hmi",
+      artifactIds: [" "],
+    }),
+    /artifact id must not be empty/,
+  );
+  assert.equal(modelCalls, 0);
+});
+
+test("HarnessAgent observational onEvent failures do not change authoritative session completion", async () => {
+  const harness = new HarnessRuntime();
+  let observerCalls = 0;
+  const agent = harness.createAgent({
+    model: {
+      id: "observer-test",
+      async complete() {
+        return { content: "done", stopReason: "completed" };
+      },
+    },
+    onEvent() {
+      observerCalls += 1;
+      throw new Error("observer failed");
+    },
+  });
+
+  const result = await agent.run("hello", {
+    sessionId: "session-observer-failure",
+  });
+
+  assert.equal(result.status, "completed");
+  assert.ok(observerCalls >= 2);
+  assert.equal(
+    (await harness.sessions.load("session-observer-failure"))?.status,
+    "completed",
+  );
+});
