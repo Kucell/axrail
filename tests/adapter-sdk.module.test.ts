@@ -5,6 +5,8 @@ import {
   AdapterContextRegistry,
   AdapterHost,
   AdapterRegistry,
+  requireCapability,
+  supportsCapability,
   type AxrailAdapter,
 } from "../packages/adapter-sdk/src/index.ts";
 
@@ -219,4 +221,33 @@ test("AdapterHost unmount removes routing state even when adapter stop fails", a
   await assert.rejects(host.unmount("stop-error"), /external stop failed/);
   assert.equal(host.list().length, 0);
   assert.equal(host.registry.has("stop-error"), false);
+});
+
+
+test("Adapter capability helpers enforce minimum support levels", () => {
+  const manifest = {
+    adapterId: "capability-adapter",
+    adapterVersion: "1",
+    capabilities: {
+      exact: { level: "exact" as const },
+      compatible: { level: "compatible" as const },
+      degraded: { level: "degraded" as const, notes: "limited" },
+      unsupported: { level: "unsupported" as const, reason: "missing" },
+    },
+  };
+
+  assert.equal(supportsCapability(manifest, "missing"), false);
+  assert.equal(supportsCapability(manifest, "degraded"), true);
+  assert.equal(supportsCapability(manifest, "compatible", "exact"), false);
+  assert.equal(supportsCapability(manifest, "exact", "compatible"), true);
+
+  assert.equal(requireCapability(manifest, "compatible").level, "compatible");
+  assert.throws(
+    () => requireCapability(manifest, "missing"),
+    /does not satisfy capability missing/,
+  );
+  assert.throws(
+    () => requireCapability(manifest, "degraded", "compatible"),
+    /does not satisfy capability degraded at level compatible/,
+  );
 });
