@@ -172,6 +172,7 @@ The HMI kit defines these standard capability names:
 ```text
 hmi.project.artifact
 hmi.project.inspect
+hmi.selection.context
 hmi.screen.create
 hmi.screen.update
 hmi.component.add
@@ -688,3 +689,77 @@ Useful repository references:
 - RFC-0009 — Transactional Mutation Pipeline.
 
 The purpose of the first real integration is to challenge these contracts with a real product. Integration feedback is expected to change future Axrail APIs; the current post-RC high-level API is intentionally pre-stable.
+## 23. Canvas selection and AI scoped editing
+
+A product with only one AI chat surface can still support OpenDesign-style select/box-select on the canvas and then continue editing through natural language.
+
+```text
+Product-owned editor interaction
+click / multi / region / hit testing
+stable screen/component IDs
+             ↓
+      SelectionContext
+             ↓
+ explicit Adapter Context
+             ↓
+        AI request
+             ↓
+          ChangeSet
+             ↓
+Policy / Validation / Approval
+             ↓
+         Transaction
+             ↓
+       private HMI Adapter
+```
+
+Axrail does not own canvas rendering, mouse gestures, hit testing, selection overlays, drag/resize, zoom/pan or editor panels.
+
+Axrail owns the explicit request-level `SelectionContext`, provider/target provenance, HMI selection normalization and the governed mutation path after a ChangeSet exists.
+
+### Explicit snapshot per AI turn
+
+Freeze the current editor selection when the user submits the AI message:
+
+```ts
+const selection = hmiRegionSelection({
+  selectionId: "sel:456",
+  providerId: "your-hmi",
+  projectId: "project:123",
+  screenId: "screen:overview",
+  componentIds: ["pump-101", "valve-102"],
+  bounds: {
+    x: 100, y: 60, width: 600, height: 300,
+    coordinateSpace: "screen:overview",
+  },
+});
+
+const fragments = await harness.adapters.buildContext(
+  {
+    purpose: "scoped-edit",
+    artifactIds: ["project:123"],
+    selection,
+  },
+  { adapterIds: ["your-hmi"], includeSensitive: false },
+);
+```
+
+Current Axrail does not automatically inject arbitrary Adapter Context into the model prompt. The first integration should explicitly include the normalized selection fragments in the product's AI request assembly.
+
+### Stable IDs are authoritative
+
+The product performs hit testing and returns stable engineering object IDs. Coordinates are supporting evidence, not durable target identity.
+
+A blank region may contain no component targets and can still express placement intent such as “put a trend chart here”. The resulting ChangeSet should target a stable screen/project and use the region as layout context.
+
+### Selection is not authorization
+
+Selection narrows user intent. It does not bypass Policy, Validation, Approval or Transaction.
+
+## 24. Product-side design input before real integration
+
+Before implementing the private Adapter, complete [Product Selection / AI Scoped-Editing Design Input](product-selection-design-input.md).
+
+The design input should describe AI chat lifecycle, canvas/renderer topology, click/multi/region selection, hit testing, stable engineering IDs, coordinate transforms, selected-object read APIs, revision/version semantics, preview/apply/verify/save APIs, rollback/compensation and process/iframe/webview/native boundaries.
+
+Related protocol: RFC-0010 Interactive Selection Context and `docs/architecture/interactive-selection-scoped-editing.md`.
