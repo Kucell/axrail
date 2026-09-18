@@ -52,6 +52,9 @@
       "@axrail/harness": [
         "packages/harness/src/index.ts"
       ],
+      "@axrail/interaction-sdk": [
+        "packages/interaction-sdk/src/index.ts"
+      ],
       "@axrail/core": [
         "packages/core/src/index.ts"
       ]
