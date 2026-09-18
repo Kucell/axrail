@@ -8,6 +8,13 @@ import type {
   AgentRunResult,
 } from "@axrail/agent";
 import type { HarnessRuntime } from "@axrail/harness";
+import type {
+  InteractionModelCapability,
+  InteractionModelDescriptor,
+  InteractionModelProvenance,
+  InteractionModelRegistration,
+  ModelRegistry,
+} from "./models.js";
 
 export type InteractionTurnStatus =
   | "completed"
@@ -16,7 +23,21 @@ export type InteractionTurnStatus =
 
 export interface InteractionRuntimeOptions {
   readonly harness: HarnessRuntime;
-  readonly model: AgentModelProvider;
+  /**
+   * Backward-compatible single-model convenience. The runtime registers this
+   * provider using provider.id as both logical model ID and provider label.
+   */
+  readonly model?: AgentModelProvider;
+  /**
+   * Optional externally owned registry for advanced applications/plugins.
+   * When omitted, InteractionRuntime creates its own registry.
+   */
+  readonly models?: ModelRegistry;
+  /**
+   * Constructor-level default only. Applications should pass modelId per turn
+   * for user-specific selection instead of mutating global runtime state.
+   */
+  readonly defaultModelId?: string;
   readonly systemPrompt?: string;
   readonly maxSteps?: number;
   /**
@@ -31,6 +52,10 @@ export interface InteractionRuntimeOptions {
 export interface InteractionSendInput {
   readonly message: string;
   readonly providerId: string;
+  /** Explicit logical model selection for this turn. */
+  readonly modelId?: string;
+  /** Required capabilities must be explicitly declared true by the model. */
+  readonly requiredModelCapabilities?: readonly InteractionModelCapability[];
   readonly purpose?: string;
   readonly artifactIds?: readonly string[];
   readonly selection?: SelectionContext;
@@ -44,6 +69,8 @@ export interface InteractionSendInput {
 export interface InteractionTurnContext {
   readonly interactionId: string;
   readonly providerId: string;
+  readonly model: InteractionModelDescriptor;
+  readonly modelProvenance: InteractionModelProvenance;
   readonly purpose: string;
   readonly artifactIds: readonly string[];
   readonly selection?: SelectionContext;
@@ -93,6 +120,7 @@ export type InteractionBeforeTurnHook = (
 export interface InteractionResult {
   readonly interactionId: string;
   readonly providerId: string;
+  readonly model: InteractionModelProvenance;
   readonly status: InteractionTurnStatus;
   readonly sessionId: string;
   readonly agent: AgentRunResult;
@@ -111,6 +139,7 @@ export interface InteractionEvent {
   readonly type:
     | "interaction.plugin.mounted"
     | "interaction.plugin.unmounted"
+    | "interaction.model.selected"
     | "interaction.turn.started"
     | "interaction.context.collected"
     | "interaction.agent.event"
@@ -128,6 +157,10 @@ export type InteractionEventListener = (
 ) => Promise<void> | void;
 
 export interface InteractionPluginApi {
+  registerModel(
+    registration: InteractionModelRegistration,
+  ): () => void;
+
   registerContextContributor(
     contributor: InteractionContextContributor,
   ): () => void;
@@ -164,6 +197,7 @@ export interface MountedInteractionPlugin {
 export interface InteractionPluginHostSnapshot {
   readonly plugins: readonly MountedInteractionPlugin[];
   readonly contextContributors: readonly string[];
+  readonly modelIds: readonly string[];
 }
 
 export interface InteractionAdapterContextSource {
