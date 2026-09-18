@@ -203,7 +203,7 @@ test("Transaction apply, verify and commit failures record distinct truth", asyn
 
 test("Transaction rollback covers unsupported, complete, partial, repeated and failure paths", async () => {
   const unsupported = new TransactionRuntime({ executor: executor(), allowWithoutPolicy: true }).begin(cs("unsupported", "L1"));
-  await assert.rejects(unsupported.rollback(), (error: unknown) => (error as TransactionError).code === "rollback_failed");
+  await assert.rejects(unsupported.rollback(), (error: unknown) => error instanceof TransactionError && error.failure.code === "rollback_failed");
   assert.equal(unsupported.snapshot().error?.code, "rollback_failed");
 
   const complete = new TransactionRuntime({
@@ -232,7 +232,7 @@ test("Transaction rollback covers unsupported, complete, partial, repeated and f
 
 test("Transaction handles invalid states, cancellation and terminal cancel idempotence", async () => {
   const tx = new TransactionRuntime({ executor: executor(), allowWithoutPolicy: true }).begin(cs("states", "L1"));
-  await assert.rejects(tx.commit(), (error: unknown) => (error as TransactionError).code === "invalid_state");
+  await assert.rejects(tx.commit(), (error: unknown) => error instanceof TransactionError && error.failure.code === "invalid_state");
   await tx.cancel();
   assert.equal(tx.state, "cancelled");
   await tx.cancel();
