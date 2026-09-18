@@ -242,6 +242,7 @@ jobs:
 
   finalize:
     needs: verify-registry
+    if: ${{ always() && needs.verify-registry.result == 'success' }}
     runs-on: ubuntu-latest
     environment: github-release
     permissions:
