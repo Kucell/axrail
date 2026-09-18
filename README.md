@@ -101,6 +101,20 @@ The npm RC packages are public. The annotated `v0.1.0-rc.1` Git tag and GitHub p
 
 See [v0.1 Release Readiness](docs/release/v0.1-readiness.md), [v0.1 Public API Surface](docs/release/v0.1-public-api.md), [Execution Boundary Semantics](docs/execution-semantics.md), and [Release Hardening](docs/release/README.md).
 
+
+
+## Post-RC main additions
+
+Current `main` contains experimental/pre-stable work that is **newer than the published 15-package npm `0.1.0-rc.1` artifact**:
+
+- **Provider-bound Transactional Mutation** — high-level `HarnessRuntime.executeChangeSet()`.
+- **Selection Context** — explicit provider-scoped click/multi/region selection contracts for engineering editors.
+- **`@axrail/interaction-sdk`** — optional headless AI interaction core with bounded Context composition, normalized events, and typed/reversible Interaction Plugins.
+
+`@axrail/interaction-sdk` follows a scoped Core + Plugin design inspired by small-core extensibility patterns, while Axrail governance remains non-overridable: Interaction Plugins cannot replace ToolRuntime, Policy, Validation, Approval, TransactionRuntime or provider-bound execution through the SDK contract.
+
+See [Interaction SDK Core + Plugin Architecture](docs/architecture/interaction-sdk-plugin-architecture.md), [RFC-0010](rfcs/0010-interactive-selection-context/README.md), and [RFC-0011](rfcs/0011-interaction-sdk-plugin-model/README.md).
+
 ## Vendor-neutral examples
 
 ### Hello Agent
@@ -206,6 +220,8 @@ Physical and safety-critical actions must remain constrained by deterministic co
 - [RFC-0007: Policy & Approval Model](rfcs/0007-policy-approval-model/README.md)
 - [RFC-0008: Event & Session Model](rfcs/0008-event-session-model/README.md)
 - [RFC-0009: Transactional Mutation Pipeline](rfcs/0009-transactional-mutation/README.md)
+- [RFC-0010: Interactive Selection Context](rfcs/0010-interactive-selection-context/README.md)
+- [RFC-0011: Headless Interaction SDK and Plugin Model](rfcs/0011-interaction-sdk-plugin-model/README.md)
 
 ## Workspace
 
