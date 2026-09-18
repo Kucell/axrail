@@ -244,7 +244,7 @@ test("Transaction handles invalid states, cancellation and terminal cancel idemp
     { signal: controller.signal },
   );
   controller.abort();
-  await assert.rejects(cancelled.prepare(), (error: unknown) => (error as TransactionError).code === "cancelled");
+  await assert.rejects(cancelled.prepare(), (error: unknown) => error instanceof TransactionError && error.failure.code === "cancelled");
   assert.equal(cancelled.state, "cancelled");
 });
 
