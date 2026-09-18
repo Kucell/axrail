@@ -7,6 +7,11 @@ import {
   buildInteractionContextEnvelope,
   mergeInteractionSystemPrompt,
 } from "./context.js";
+import {
+  ModelRegistry,
+  modelProvenance,
+  type InteractionModelProvenance,
+} from "./models.js";
 import { InteractionPluginHost } from "./plugin-host.js";
 import type {
   InteractionContextFragment,
@@ -22,10 +27,11 @@ import type {
 const DEFAULT_MAX_CONTEXT_CHARS = 50_000;
 
 export class InteractionRuntime {
-  readonly plugins = new InteractionPluginHost();
+  readonly models: ModelRegistry;
+  readonly plugins: InteractionPluginHost;
 
   private readonly harness: InteractionRuntimeOptions["harness"];
-  private readonly model: InteractionRuntimeOptions["model"];
+  private readonly defaultModelId?: string;
   private readonly systemPrompt?: string;
   private readonly maxSteps?: number;
   private readonly maxContextChars: number;
@@ -35,7 +41,24 @@ export class InteractionRuntime {
 
   constructor(options: InteractionRuntimeOptions) {
     this.harness = options.harness;
-    this.model = options.model;
+    this.models = options.models ?? new ModelRegistry();
+    this.plugins = new InteractionPluginHost(this.models);
+
+    if (options.model) {
+      this.models.register({
+        descriptor: {
+          id: options.model.id,
+          providerId: options.model.id,
+          displayName: options.model.id,
+        },
+        provider: options.model,
+      });
+    }
+
+    this.defaultModelId = options.defaultModelId !== undefined
+      ? requiredText(options.defaultModelId, "Interaction default model id")
+      : options.model?.id;
+
     this.systemPrompt = options.systemPrompt;
     this.maxSteps = options.maxSteps;
     this.maxContextChars = options.maxContextChars ?? DEFAULT_MAX_CONTEXT_CHARS;
@@ -101,25 +124,11 @@ export class InteractionRuntime {
       assertSelectionProvider(input.selection, providerId);
     }
 
-    // Fail before model execution when the requested engineering provider is
-    // not mounted/available.
+    // Engineering provider scope must exist independently of model choice.
     this.harness.adapters.get(providerId);
 
     const interactionId = this.idFactory();
-    const context: InteractionTurnContext = Object.freeze({
-      interactionId,
-      providerId,
-      purpose,
-      artifactIds,
-      selection: input.selection,
-      actorId: input.actorId,
-      sessionId: input.sessionId,
-      signal: input.signal,
-      includeSensitiveContext: input.includeSensitiveContext ?? false,
-      metadata: input.metadata
-        ? Object.freeze({ ...input.metadata })
-        : undefined,
-    });
+    let selectedModelProvenance: InteractionModelProvenance | undefined;
 
     await this.emit({
       type: "interaction.turn.started",
@@ -129,10 +138,45 @@ export class InteractionRuntime {
         providerId,
         purpose,
         selectionId: input.selection?.selectionId,
+        requestedModelId: input.modelId,
       },
     });
 
     try {
+      const selectedModel = this.models.resolve({
+        modelId: input.modelId,
+        defaultModelId: this.defaultModelId,
+        requiredCapabilities: input.requiredModelCapabilities,
+      });
+      selectedModelProvenance = modelProvenance(selectedModel);
+
+      await this.emit({
+        type: "interaction.model.selected",
+        time: this.now(),
+        interactionId,
+        data: {
+          ...selectedModelProvenance,
+          capabilities: selectedModel.descriptor.capabilities,
+        },
+      });
+
+      const context: InteractionTurnContext = Object.freeze({
+        interactionId,
+        providerId,
+        model: selectedModel.descriptor,
+        modelProvenance: selectedModelProvenance,
+        purpose,
+        artifactIds,
+        selection: input.selection,
+        actorId: input.actorId,
+        sessionId: input.sessionId,
+        signal: input.signal,
+        includeSensitiveContext: input.includeSensitiveContext ?? false,
+        metadata: input.metadata
+          ? Object.freeze({ ...input.metadata })
+          : undefined,
+      });
+
       await this.plugins.runBeforeTurn(context);
 
       const adapterFragments = await this.harness.adapters.buildContext(
@@ -176,13 +220,14 @@ export class InteractionRuntime {
         interactionId,
         data: {
           providerId,
+          modelId: selectedModelProvenance.modelId,
           fragmentCount: fragments.length,
           envelopeChars: envelope.length,
         },
       });
 
       const agent = this.harness.createAgent({
-        model: this.model,
+        model: selectedModel.provider,
         systemPrompt: mergeInteractionSystemPrompt(
           this.systemPrompt,
           envelope,
@@ -200,12 +245,17 @@ export class InteractionRuntime {
           ...input.metadata,
           interactionId,
           interactionProviderId: providerId,
+          interactionModelId: selectedModelProvenance.modelId,
+          interactionModelProviderId: selectedModelProvenance.modelProviderId,
+          interactionModelRuntimeProviderId:
+            selectedModelProvenance.runtimeProviderId,
         },
       });
 
       const result: InteractionResult = Object.freeze({
         interactionId,
         providerId,
+        model: selectedModelProvenance,
         status: agentResult.status,
         sessionId: agentResult.sessionId,
         agent: agentResult,
@@ -225,6 +275,7 @@ export class InteractionRuntime {
         interactionId,
         data: {
           providerId,
+          model: selectedModelProvenance,
           status: agentResult.status,
           sessionId: agentResult.sessionId,
           steps: agentResult.steps,
@@ -239,6 +290,8 @@ export class InteractionRuntime {
         interactionId,
         data: {
           providerId,
+          model: selectedModelProvenance,
+          requestedModelId: input.modelId,
           error: errorMessage(error),
         },
       });
