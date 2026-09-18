@@ -96,6 +96,7 @@ Typical integration code uses:
 
 ```text
 @axrail/harness
+@axrail/interaction-sdk   # post-RC optional AI interaction/context/plugin layer
 @axrail/adapter-sdk
 @axrail/hmi-adapter-kit
 @axrail/artifacts
@@ -763,3 +764,16 @@ Before implementing the private Adapter, complete [Product Selection / AI Scoped
 The design input should describe AI chat lifecycle, canvas/renderer topology, click/multi/region selection, hit testing, stable engineering IDs, coordinate transforms, selected-object read APIs, revision/version semantics, preview/apply/verify/save APIs, rollback/compensation and process/iframe/webview/native boundaries.
 
 Related protocol: RFC-0010 Interactive Selection Context and `docs/architecture/interactive-selection-scoped-editing.md`.
+
+
+## 25. Use the Interaction SDK for reusable AI chat integration
+
+When multiple third-party engineering products integrate with Axrail, do not reimplement the AI Chat → Context → Selection → Agent glue independently in each product.
+
+The post-RC `@axrail/interaction-sdk` provides a headless `InteractionRuntime` with explicit selection snapshots, Adapter/plugin Context collection, bounded context envelopes, normalized events and typed InteractionPlugin extensions.
+
+Plugins may extend context and observe turn/events, but cannot bypass Policy, Validation, Approval, Transaction or provider-bound execution.
+
+The first implementation is turn-oriented. Persisted multi-turn continuation is intentionally not frozen yet; it should later converge on authoritative Harness Session/Event semantics rather than create a competing transcript truth.
+
+See `docs/architecture/interaction-sdk-plugin-architecture.md` and RFC-0011.
