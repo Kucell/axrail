@@ -101,6 +101,20 @@ npm RC 包已经公开。Annotated `v0.1.0-rc.1` Git tag 与 GitHub prerelease �
 
 参见 [v0.1 Release Readiness](docs/release/v0.1-readiness.md)、[v0.1 Public API Surface](docs/release/v0.1-public-api.md)、[Execution Boundary Semantics](docs/execution-semantics.md) 与 [Release Hardening](docs/release/README.md)。
 
+
+
+## post-RC main 新增能力
+
+当前 `main` 已包含一些**晚于 npm 已发布 15 个 `0.1.0-rc.1` 包**的 pre-stable 能力：
+
+- **Provider-bound Transactional Mutation** — 高层 `HarnessRuntime.executeChangeSet()`。
+- **Selection Context** — 面向工程编辑器点击/多选/框选的显式 provider-scoped Selection 协议。
+- **`@axrail/interaction-sdk`** — 可选 headless AI 交互核心，提供受限 Context 组合、统一事件和 typed/reversible Interaction Plugin。
+
+Interaction SDK 采用“核心 + 插件”的局部扩展模型，但不会恢复 Axrail-wide generic plugin kernel。Interaction Plugin 通过 SDK 合同不能替换或绕过 ToolRuntime、Policy、Validation、Approval、TransactionRuntime 或 provider-bound execution。
+
+参见 [Interaction SDK Core + Plugin Architecture](docs/architecture/interaction-sdk-plugin-architecture.md)、[RFC-0010](rfcs/0010-interactive-selection-context/README.md) 与 [RFC-0011](rfcs/0011-interaction-sdk-plugin-model/README.md)。
+
 ## 厂商中立示例
 
 ### Hello Agent
@@ -206,6 +220,8 @@ Axrail 的软件 Policy 与 Approval **不能替代** Safety PLC、Interlock、E
 - [RFC-0007: Policy & Approval Model](rfcs/0007-policy-approval-model/README.md)
 - [RFC-0008: Event & Session Model](rfcs/0008-event-session-model/README.md)
 - [RFC-0009: Transactional Mutation Pipeline](rfcs/0009-transactional-mutation/README.md)
+- [RFC-0010: Interactive Selection Context](rfcs/0010-interactive-selection-context/README.md)
+- [RFC-0011: Headless Interaction SDK and Plugin Model](rfcs/0011-interaction-sdk-plugin-model/README.md)
 
 ## Workspace
 
