@@ -180,6 +180,7 @@ The SDK:
 
 First version:
 
+- `registerModel()`
 - `registerContextContributor()`
 - `registerBeforeTurn()`
 - `registerAfterTurn()`
@@ -215,3 +216,127 @@ See:
 - RFC-0011
 - RFC-0010 for Selection Context
 - AI-native HMI integration guide
+
+
+## Model registry and switching
+
+For multiple selectable models, use `ModelRegistry`:
+
+```ts
+import {
+  InteractionRuntime,
+  ModelRegistry,
+} from "@axrail/interaction-sdk";
+
+const models = new ModelRegistry();
+
+models.register({
+  descriptor: {
+    id: "fast",
+    providerId: "vendor-a",
+    displayName: "Fast model",
+    capabilities: {
+      toolCalling: true,
+      reasoning: false,
+    },
+  },
+  provider: fastProvider,
+});
+
+models.register({
+  descriptor: {
+    id: "reasoning",
+    providerId: "vendor-b",
+    displayName: "Reasoning model",
+    capabilities: {
+      toolCalling: true,
+      reasoning: true,
+    },
+  },
+  provider: reasoningProvider,
+});
+
+const interaction = new InteractionRuntime({
+  harness,
+  models,
+  defaultModelId: "fast",
+});
+
+const available = interaction.models.list();
+
+await interaction.send({
+  message: "Modify the selected engineering objects",
+  providerId: "vendor-hmi",
+  modelId: "reasoning",
+  requiredModelCapabilities: ["toolCalling", "reasoning"],
+  selection,
+});
+```
+
+Resolution order:
+
+```text
+send.modelId
+  ↓
+defaultModelId
+  ↓
+single registered model
+  ↓
+otherwise fail closed
+```
+
+No automatic routing or silent fallback is performed in the first version.
+
+### Model plugin
+
+Interaction plugins may register model providers:
+
+```ts
+const modelPlugin: InteractionPlugin = {
+  id: "vendor.private-model",
+
+  setup(api) {
+    return api.registerModel({
+      descriptor: {
+        id: "factory-model",
+        providerId: "vendor-private",
+        capabilities: {
+          toolCalling: true,
+        },
+      },
+      provider: privateProvider,
+    });
+  },
+};
+```
+
+Model registration follows plugin rollback/unmount semantics.
+
+### Credential boundary
+
+`InteractionModelDescriptor` contains no credential field.
+
+Keep credentials inside the concrete model provider:
+
+```ts
+new OpenAICompatibleResponsesProvider({
+  model: "your-model",
+  apiKey: async () => secretStore.get("MODEL_API_KEY"),
+});
+```
+
+Do not copy model credentials into Selection, Context, interaction events, model descriptors or audit metadata.
+
+### Provenance
+
+Each Interaction result/event identifies:
+
+```text
+modelId
+modelProviderId
+runtimeProviderId
+```
+
+This is provenance, not Approval/Policy authority.
+
+See `docs/architecture/model-registry-runtime-selection.md` and RFC-0012.
