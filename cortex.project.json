@@ -1,0 +1,88 @@
+{
+  "schema_version": "1",
+  "project_id": "axrail",
+  "repository": {
+    "slug": "Kucell/axrail",
+    "default_branch": "main"
+  },
+  "integration_mode": "connected",
+  "capabilities": {
+    "provided": [
+      "project.discover",
+      "project.validation.list",
+      "project.validation.run",
+      "project.artifact.list",
+      "project.event.read"
+    ],
+    "required": []
+  },
+  "validation": {
+    "profiles": [
+      {
+        "id": "typecheck",
+        "command": "pnpm check",
+        "purpose": "TypeScript source contract validation",
+        "blocking": true
+      },
+      {
+        "id": "test",
+        "command": "pnpm test",
+        "purpose": "Build plus behavioral test suite",
+        "blocking": true
+      },
+      {
+        "id": "pack-smoke",
+        "command": "pnpm pack:smoke",
+        "purpose": "Public package tarball and consumer smoke validation",
+        "blocking": true
+      },
+      {
+        "id": "release-dry-run",
+        "command": "pnpm release:dry-run",
+        "purpose": "Axrail release gate: check + test + package smoke",
+        "blocking": true
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "architecture",
+      "path": "docs/architecture/README.md",
+      "kind": "architecture"
+    },
+    {
+      "id": "runtime-embedding",
+      "path": "docs/runtime-embedding.md",
+      "kind": "integration"
+    },
+    {
+      "id": "release-readiness",
+      "path": "docs/release/README.md",
+      "kind": "release-evidence"
+    },
+    {
+      "id": "public-api",
+      "path": "docs/release/v0.1-public-api.md",
+      "kind": "api-contract"
+    }
+  ],
+  "events": {
+    "mode": "observational",
+    "source": "@axrail/events"
+  },
+  "boundaries": {
+    "authoritative_domain": "axrail",
+    "authoritative_runtime": "axrail",
+    "cortex_role": "governance-orchestration",
+    "protected_components": [
+      "HarnessRuntime",
+      "ToolRuntime",
+      "Policy",
+      "Validation",
+      "Approval",
+      "TransactionRuntime",
+      "EventStore",
+      "EngineeringAdapters"
+    ]
+  }
+}
