@@ -203,6 +203,7 @@ Physical and safety-critical actions must remain constrained by deterministic co
 ## Architecture, release and RFCs
 
 - [Architecture overview](docs/architecture/README.md)
+- [Cortex connected-project pilot](docs/integrations/cortex.md)
 - [Architecture and design](docs/architecture/design.md)
 - [AI-native HMI Integration Guide](docs/integrations/ai-native-hmi/README.md)
 - [HMI Integration Feedback Template](docs/integrations/ai-native-hmi/feedback-template.md)
