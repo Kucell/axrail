@@ -10,6 +10,7 @@ Axrail separates Agent intent from governed execution. Durable engineering chang
 - [Interaction SDK Core + Plugin Architecture](interaction-sdk-plugin-architecture.md) — headless product-facing interaction core with typed, reversible plugins above Harness governance.
 - [Model Registry and Runtime Model Selection](model-registry-runtime-selection.md) — explicit model registration, per-turn switching, capabilities and provenance while Harness stays model-agnostic.
 - [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — vendor-neutral selection snapshot and HMI scoped-editing boundary.
+- [RFC-0014 有限资源设备的 Go 运行时](../../rfcs/0014-constrained-device-go-runtime/README.md) — 待评审的语言中立治理契约、Go 参考程序、资源预算与一致性验证方案；尚未实现。
 
 ## Current runtime model
 
