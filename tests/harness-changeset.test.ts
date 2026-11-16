@@ -326,3 +326,26 @@ test("Harness executeChangeSet rejects empty executor provider ID before any eff
 
   assert.equal(applied, false);
 });
+
+test("Harness executeChangeSet rejects whitespace-only provider IDs before any effect", async () => {
+  const harness = new HarnessRuntime();
+  let applied = false;
+
+  await assert.rejects(
+    harness.executeChangeSet(changeSet("cs-whitespace-provider"), {
+      executor: {
+        id: "whitespace-provider-executor",
+        providerId: " \t ",
+        mode: "atomic",
+        apply() {
+          applied = true;
+          return {};
+        },
+      },
+      allowWithoutPolicy: true,
+    }),
+    /requires a non-empty providerId/,
+  );
+
+  assert.equal(applied, false);
+});
