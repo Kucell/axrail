@@ -303,3 +303,66 @@ test("Harness executeChangeSet binds required approval to ChangeSet evidence bef
   assert.ok(result.approvedEvidenceDigest);
   assert.equal(applied, true);
 });
+
+test("Harness executeChangeSet rejects empty executor provider ID before any effect", async () => {
+  const harness = new HarnessRuntime();
+  let applied = false;
+
+  await assert.rejects(
+    harness.executeChangeSet(changeSet("cs-empty-provider"), {
+      executor: {
+        id: "executor-without-provider",
+        providerId: "",
+        mode: "atomic",
+        apply() {
+          applied = true;
+          return {};
+        },
+      },
+      allowWithoutPolicy: true,
+    }),
+    /requires a non-empty providerId/,
+  );
+
+  assert.equal(applied, false);
+});
+
+test("Harness executeChangeSet accepts an explicitly matching Artifact provider", async () => {
+  const harness = new HarnessRuntime();
+  await harness.mountAdapter({
+    id: "provider-a",
+    version: "1.0.0",
+    async capabilities() {
+      return {
+        adapterId: "provider-a",
+        adapterVersion: "1.0.0",
+        capabilities: {},
+      };
+    },
+  });
+
+  let applied = false;
+  const result = await harness.executeChangeSet(
+    {
+      id: "cs-matching-provider",
+      protocolVersion: "0.1",
+      artifacts: [{ id: "screen:overview", type: "hmi.screen", provider: "provider-a" }],
+      operations: [{ op: "update", target: "screen:overview" }],
+    },
+    {
+      executor: {
+        id: "provider-a-executor",
+        providerId: "provider-a",
+        mode: "atomic",
+        apply() {
+          applied = true;
+          return {};
+        },
+      },
+      allowWithoutPolicy: true,
+    },
+  );
+
+  assert.equal(result.state, "committed");
+  assert.equal(applied, true);
+});
