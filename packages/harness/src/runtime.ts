@@ -193,7 +193,7 @@ export class HarnessRuntime {
     options: HarnessChangeSetExecutionOptions,
   ): Promise<TransactionRecord> {
     const providerId = options.executor.providerId;
-    if (!providerId) {
+    if (!providerId || !providerId.trim()) {
       throw new Error("Provider-bound TransactionExecutor requires a non-empty providerId");
     }
 
