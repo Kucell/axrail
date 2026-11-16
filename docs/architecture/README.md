@@ -11,7 +11,7 @@ Axrail separates Agent intent from governed execution. Durable engineering chang
 - [Model Registry and Runtime Model Selection](model-registry-runtime-selection.md) — explicit model registration, per-turn switching, capabilities and provenance while Harness stays model-agnostic.
 - [RFC-0010 Interactive Selection Context](../../rfcs/0010-interactive-selection-context/README.md) — vendor-neutral selection snapshot and HMI scoped-editing boundary.
 - [RFC-0015 决策智能与工业 Agent 评估体系](../../rfcs/0015-decision-intelligence-evaluation/README.md) — 设计候选：Jev/System One 辅助分类、风险初筛、路由和可重复评估；不授予执行权限。
-- [RFC-0014 跨语言工业 AI 治理契约与受限设备 Go 运行时](../../rfcs/0014-constrained-device-go-runtime/README.md) — 待评审：统一可移植治理协议、HMI/焊接仿真/工业终端三场景、Go 只读参考 Runner、G0—G5 验收与跨语言一致性；尚未实现 Go SDK。
+- [RFC-0014 跨语言工业 AI 治理契约与受限设备 Go 运行时](../../rfcs/0014-constrained-device-go-runtime/README.md) — 待评审：统一可移植治理协议、HMI/焊接仿真/工业终端三场景、Go 只读参考 Runner、Rust/Go 同负载选型 PoC、G0—G5 验收与跨语言一致性；尚未实现 Go/Rust SDK。
 
 ## Current runtime model
 
@@ -71,7 +71,7 @@ For durable L2/L3 engineering mutations, the roadmap direction is to make Change
 11. [RFC-0011 Headless Interaction SDK and Plugin Model](../../rfcs/0011-interaction-sdk-plugin-model/README.md) — reusable AI interaction core with a constrained plugin extension surface.
 12. [RFC-0012 Model Registry and Runtime Model Selection](../../rfcs/0012-model-registry-runtime-selection/README.md) — reusable model picker/selection/capability/provenance contract for the Interaction layer.
 13. [RFC-0013 Vercel AI SDK Model Provider Convergence](../../rfcs/0013-ai-sdk-provider-convergence/README.md) — current model-provider bridge strategy; does not grant Tool authority.
-14. [RFC-0014 Portable Industrial Governance Contract + Constrained Go Runtime](../../rfcs/0014-constrained-device-go-runtime/README.md) — proposal only; cross-language conformance and three scenario validation, with separate Go implementation gates.
+14. [RFC-0014 Portable Industrial Governance Contract + Constrained Go Runtime](../../rfcs/0014-constrained-device-go-runtime/README.md) — proposal only; cross-language conformance, three scenario validation and Rust/Go constrained-runtime selection PoC, with separate implementation gates.
 
 15. [RFC-0015 Decision Intelligence & Industrial Agent Evaluation](../../rfcs/0015-decision-intelligence-evaluation/README.md) — proposed advisory decision providers, deterministic safety boundaries, and HMI/welding/edge evaluation gates.
 
