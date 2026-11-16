@@ -303,3 +303,26 @@ test("Harness executeChangeSet binds required approval to ChangeSet evidence bef
   assert.ok(result.approvedEvidenceDigest);
   assert.equal(applied, true);
 });
+
+test("Harness executeChangeSet rejects empty executor provider ID before any effect", async () => {
+  const harness = new HarnessRuntime();
+  let applied = false;
+
+  await assert.rejects(
+    harness.executeChangeSet(changeSet("cs-empty-provider"), {
+      executor: {
+        id: "executor-without-provider",
+        providerId: "",
+        mode: "atomic",
+        apply() {
+          applied = true;
+          return {};
+        },
+      },
+      allowWithoutPolicy: true,
+    }),
+    /requires a non-empty providerId/,
+  );
+
+  assert.equal(applied, false);
+});
