@@ -34,6 +34,7 @@
     "@axrail/adapter-sdk": "workspace:*",
     "@axrail/agent": "workspace:*",
     "@axrail/approval": "workspace:*",
+    "@axrail/changesets": "workspace:*",
     "@axrail/events": "workspace:*",
     "@axrail/policy": "workspace:*",
     "@axrail/tools": "workspace:*",
