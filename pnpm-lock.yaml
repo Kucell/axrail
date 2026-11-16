@@ -127,6 +127,9 @@ importers:
       '@axrail/approval':
         specifier: workspace:*
         version: link:../approval
+      '@axrail/changesets':
+        specifier: workspace:*
+        version: link:../changesets
       '@axrail/events':
         specifier: workspace:*
         version: link:../events
