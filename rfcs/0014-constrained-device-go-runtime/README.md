@@ -435,3 +435,75 @@ flowchart TB
 本 PR 只更新 RFC 与架构索引，**合并 = 接纳问题陈述和拟议设计记录，不等于 G0 通过，更不等于 G1—G5 开发、API 冻结或公开承诺。** 实施需先记录所有者、范围、审批、失败停止条件和基线，再按 Gate 创建独立 PR；不得绕过现有 Axrail/Cortex 的开发与发布流程。
 
 任何宣传或 README 应准确区分“已实现 TS Harness”“拟议跨语言治理契约”“实验 Go 只读 Runner”“未来可选 Go/Python SDK”，不把参考测试、性能目标或模拟设备结果表述为生产认证。
+
+## 23. Rust 与 Go 边缘运行时选型补充（2026-11-16，设计提议）
+
+本节补充 Rust 的正式技术候选地位，**不撤销 G0—G5 和现有 Go 参考 Runner 的设计路径**，也不授权同时建设两套正式运行时。当前 TypeScript / Node.js 的 `HarnessRuntime`、`AdapterHost`、Tool、Policy、Approval、ChangeSet、Transaction 为唯一受支持的主组合基线。Rust 或 Go 仅作为有限资源设备的 *constrained-device profile* 或高可靠原生组件候选。
+
+### 23.1 拟议 ADR 结论
+
+- **保留 TypeScript 主运行时**：Agent 编排、模型/决策适配、Interaction SDK、HMI Tool/Adapter 与治理逻辑优先由已有 TS 代码实现；不为语言统一重写已验证功能。
+- **保留 Go 参考路线**：适合 Linux/ARM64 守护进程、网络/边缘服务与工程维护成本敏感场景，RFC 0014 原 G2 Go 只读样例暂不变更承诺状态。
+- **增加 Rust 对照路线**：在相同受限 profile 下与 Go、TS 对比资源、稳定性、协议一致性、安全性和集成成本；可优先试验高风险非可信二进制解析、规范化证据与独立原生进程，但不能假设 Rust 本身等于工业安全认证。
+- **生产决策以证据驱动**：不提前宣布 Rust/Go 胜出，不同时发布两套独立的具备副作用的治理内核。目标语言选定需要独立 ADR/Gate、维护所有者和测试报告。
+- **物理与安全边界不变**：首期 Rust/Go 均限设备只读采样、报警诊断、离线规则及模拟设备；禁止 PLC 写入、机器人实际运动、任意 Shell、绕开设备 Runtime 或自行确认审批。模型/决策层和 Rust FFI 都不能取得执行权限。
+
+### 23.2 对照架构
+
+```text
+Agent / HMI / Welding Application (TypeScript Harness - supported)
+   |
+Portable Governance Contract (schema/profile/evidence/identity/canonical digest)
+   |
+   +-- TS-only / TS on device (comparison baseline)
+   +-- Go constrained Runner (proposed reference)
+   +-- Rust constrained Runner (candidate PoC; no product commitment)
+   +-- Rust native module (optional isolated component PoC)
+   |
+Device Context Port / mock Adapter (read only; product Runtime authoritative)
+```
+
+`Portable Governance Contract` 是规范及共享测试向量，不是第三套 Control Plane。跨设备情形须重新认证身份、目标、版本、时效、nonce、撤销和结果。ABI、FFI、RPC 只是传输边界，不是授权边界。
+
+### 23.3 先做两项最小 PoC
+
+| PoC | 同一输入与边界 | Go / Rust 产出 | 失败停止条件 |
+| --- | --- | --- | --- |
+| P1：规范化证据/受限协议解析 | TS golden vectors；Unicode、数值精度、时间、unknown/null、恶意数据、超大报文 | 两种语言各自生成 digest/明确拒绝及可复现 fuzz 测试，记录依赖和工程成本 | 任一无效数据被视为有效审批/证据、摘要不一致未显式拒绝、崩溃造成越权 |
+| P2：ARM64 只读报警诊断 | 同款设备与固件、相同固定 fixture/事件频率/规则、相同模型位置与断网模式 | Go/Rust 均实现受限 Context Port、事件序号/epoch、规则诊断、审计与崩溃恢复；TS 设备侧方案作为第三对照 | 写入现场 I/O、无授权访问、失联后重放动作、宿主报警/GUI 失效 |
+
+P1 可先于 P2 单独实施，不预设 Rust 改写主 `Policy`、`Transaction` 或 `Approval`。如果 P1/P2 的收益不足以覆盖维护成本，继续 TS+Go/Context Port 方案，不引入 Rust 发行物。
+
+### 23.4 公平测量与质量门槛
+
+所有报告必须明确测试硬件、内核/BSP、编译器版本、编译 flags、依赖、样本量、测试次数、背景宿主负载、模型是否在本机、测量命令及原始数据链接；Go 和 Rust 均使用 release 优化构建，TS 使用相同任务与资源限制。不能把不同模型位置、不同能力集合或不同错误处理视作等价比较。
+
+| 维度 | 必需数据及判断 |
+| --- | --- |
+| 内存/CPU | RSS、PSS、峰值、CPU 使用与 cgroup throttling；含宿主和独立子进程资源 |
+| 延迟 | 冷启动、P50/P95/P99、事件→告警建议延迟、吞吐和背压/事件 gap |
+| 稳定性 | 72h、杀进程/断电模拟、磁盘满、网络 flap、重启 epoch、消息乱序 |
+| 安全 | 类型/schema 拒绝、越权/重放拒绝、audit checkpoint、fuzz/corpus、依赖漏洞扫描 |
+| 证据一致性 | 同一 portable-profile 的规范字段、摘要、`unsupported`/错误和 `execution_uncertain` 语义 |
+| 工程成本 | 实现工时、代码/依赖体量、构建与交叉编译、SBOM、补丁响应、团队维护能力 |
+| 兼容发布 | linux/arm64 和实际板型验证；动态库 ABI、升级/回滚和供应链可追溯性 |
+
+原第 7、19 节提出的 64MiB idle RSS、128MiB peak RSS、宿主 P95 增幅 ≤10% 与 72h 均为**候选实验目标**，不能改写为已达标数据。安全与协议 conformance 是必须通过项；性能比较基于实测分布和应用预算决定，不使用无依据的 Rust 一定快/Go 一定小推断。
+
+### 23.5 G0—G5 中的选型 Gate
+
+- **G0 更新**：维护者记录 `ADR: constrained runtime language selection`，将 Rust 纳入“实验候选”；记录 TS 主 Harness 不迁移和双语言正式 Runner 禁止并行承诺。
+- **G1**：以 TS 行为建立语言中立 contract/golden vectors；新增 Rust/Go 的数值精度、签名、digest、未知字段与反重放负面测试。
+- **G2（对照 PoC）**：先完成 P1，再以 Go 受限只读参考样例为基线实现等价 Rust 小样；不发行 Rust SDK。
+- **G3**：ARM64 同负载、72h、断网/崩溃/磁盘满与宿主共存三方测量，保存原始数据。
+- **G4**：HMI/焊接仿真 Adapter 的共享证据，确认协议非语言/行业特化；仍不得重写 Python 工程 Worker。
+- **G5 决策**：选择 TS-only、TS+Go、TS+Rust 或有明确组件隔离的组合；写出维护责任、版本支持矩阵、成本、升级/回滚和否决原因。未达标保持 `experimental/unsupported`。
+
+### 23.6 需要另外批准的任务
+
+1. ADR 评审与数据集/设备 fixture 定稿（设计任务）。
+2. P1 Rust/Go 规范化摘要和协议解析最小实现（实验代码 PR）。
+3. P2 ARM64 同负载只读诊断实验（实验代码/设备结果 PR）。
+4. 基于结果修改 RFC 与 SDK/Runner 发布计划（独立 G5 决策）。
+
+**本节仅完成 RFC 的选型设计补充。** 不包含 Rust 实现、设备实验结果、生产变更、稳定 API 承诺或 G0/G1—G5 已通过的声明。
