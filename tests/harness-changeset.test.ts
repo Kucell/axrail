@@ -6,6 +6,7 @@ import {
   CallbackApprovalProvider,
 } from "../packages/approval/src/index.ts";
 import { HarnessRuntime } from "../packages/harness/src/index.ts";
+import { digestChangeSet } from "../packages/changesets/src/index.ts";
 
 function changeSet(id: string) {
   return {
@@ -347,5 +348,87 @@ test("Harness executeChangeSet rejects whitespace-only provider IDs before any e
     /requires a non-empty providerId/,
   );
 
+  assert.equal(applied, false);
+});
+
+test("Harness blocks a changed HMI ChangeSet after preview before any effect", async () => {
+  const harness = new HarnessRuntime();
+  await harness.mountAdapter({
+    id: "preview-hmi",
+    version: "1.0.0",
+    async capabilities() {
+      return { adapterId: "preview-hmi", adapterVersion: "1.0.0", capabilities: {} };
+    },
+  });
+
+  const previewed = {
+    id: "cs-preview",
+    protocolVersion: "0.1",
+    artifacts: [],
+    operations: [{
+      op: "update" as const,
+      target: "component:temperature",
+      value: { alarmThresholdCelsius: 80 },
+    }],
+  };
+  const previewDigest = await digestChangeSet(previewed);
+  let applied = 0;
+  const executor = {
+    id: "preview-hmi-executor",
+    providerId: "preview-hmi",
+    mode: "atomic" as const,
+    apply() { applied += 1; return {}; },
+  };
+
+  const changed = {
+    ...previewed,
+    operations: [{
+      op: "update" as const,
+      target: "component:temperature",
+      value: { alarmThresholdCelsius: 95 },
+    }],
+  };
+  await assert.rejects(
+    harness.executeChangeSet(changed, {
+      executor,
+      allowWithoutPolicy: true,
+      expectedChangeSetDigest: previewDigest,
+    }),
+    /does not match the expected preview evidence digest/,
+  );
+  assert.equal(applied, 0);
+
+  const accepted = await harness.executeChangeSet(previewed, {
+    executor,
+    allowWithoutPolicy: true,
+    expectedChangeSetDigest: previewDigest,
+  });
+  assert.equal(accepted.state, "committed");
+  assert.equal(applied, 1);
+});
+
+test("Harness rejects an invalid preview digest rather than silently ignoring it", async () => {
+  const harness = new HarnessRuntime();
+  await harness.mountAdapter({
+    id: "preview-hmi",
+    version: "1.0.0",
+    async capabilities() {
+      return { adapterId: "preview-hmi", adapterVersion: "1.0.0", capabilities: {} };
+    },
+  });
+  let applied = false;
+  await assert.rejects(
+    harness.executeChangeSet(changeSet("cs-missing-preview-evidence"), {
+      executor: {
+        id: "preview-hmi-executor",
+        providerId: "preview-hmi",
+        mode: "atomic",
+        apply() { applied = true; return {}; },
+      },
+      allowWithoutPolicy: true,
+      expectedChangeSetDigest: "",
+    }),
+    /does not match the expected preview evidence digest/,
+  );
   assert.equal(applied, false);
 });
