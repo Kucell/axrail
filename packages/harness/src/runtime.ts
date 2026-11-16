@@ -18,6 +18,7 @@ import {
   type EventStore,
 } from "@axrail/events";
 import type { PolicyInput } from "@axrail/policy";
+import { digestChangeSet } from "@axrail/changesets";
 import {
   ToolRuntime,
   type ToolApprovalProvider,
@@ -79,6 +80,13 @@ export interface HarnessChangeSetExecutionOptions {
   readonly actor?: TransactionContext["actor"];
   readonly environment?: string;
   readonly expectedVersions?: TransactionContext["expectedVersions"];
+  /**
+   * Optional digest captured by the trusted application when rendering the
+   * exact ChangeSet preview. Rejects changed proposals before policy or effect.
+   * The application must authenticate and retain preview provenance; a
+   * model-supplied digest is not approval or trusted preview evidence.
+   */
+  readonly expectedChangeSetDigest?: string;
   readonly sessionId?: string;
   readonly correlationId?: string;
   readonly metadata?: TransactionContext["metadata"];
@@ -199,6 +207,12 @@ export class HarnessRuntime {
 
     this.adapters.get(providerId);
     assertChangeSetProviderBinding(changeSet, providerId);
+    if (options.expectedChangeSetDigest !== undefined) {
+      const actualDigest = await digestChangeSet(changeSet);
+      if (actualDigest !== options.expectedChangeSetDigest) {
+        throw new Error("ChangeSet does not match the expected preview evidence digest");
+      }
+    }
 
     const runtime = this.createTransactionRuntime({
       executor: options.executor,
