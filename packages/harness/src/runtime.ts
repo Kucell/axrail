@@ -76,6 +76,7 @@ export interface HarnessChangeSetExecutionOptions {
    */
   readonly executor: ProviderBoundTransactionExecutor;
   readonly allowWithoutPolicy?: boolean;
+  readonly effectFailureMode?: TransactionRuntimeOptions["effectFailureMode"];
   readonly requiredApprovers?: readonly ApprovalRequirement[];
   readonly onEvent?: TransactionRuntimeOptions["onEvent"];
   readonly actor?: TransactionContext["actor"];
