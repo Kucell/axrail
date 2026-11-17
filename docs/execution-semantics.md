@@ -56,6 +56,34 @@ committed or automatically roll it back. The `legacy` mode retains existing
 `execution_failed`, `verification_failed`, and `commit_failed` semantics
 until separately reviewed for a broader compatibility change.
 
+## Read-only assessment after an uncertain transaction (beta experimental)
+
+`assessUncertainTransaction(transaction, provider)` supplies a **read-only
+reconciliation assessment** for `execution_uncertain` results. The caller
+supplies a trusted, authenticated domain `TransactionReadbackProvider`; it
+must not execute another engineering mutation while gathering evidence.
+
+- It requires the same transaction ID, a freshly calculated ChangeSet SHA-256
+  digest, the transaction-bound Adapter ID, a nonempty evidence reference, and
+  an observation timestamp no older than the uncertain transition.
+- The Adapter may report `effect_present`, `effect_absent`, or `unknown`.
+  The helper returns `observed_applied`, `observed_absent`, or `unresolved`.
+- These are **observations only**, not new transaction states or proof of a
+  completed commit. `retrySafe` is always `false`; no automatic commit,
+  retry, rollback, or mutation of the original `TransactionRecord` occurs.
+- An offline Adapter, mismatched binding, invalid timestamp or stale evidence
+  yields `unresolved`; absence of an effect is not sufficient to authorize a
+  new execution without a separate idempotency and governance decision.
+
+The library cannot independently certify the Adapter identity, trustworthy
+clock, authenticity of its evidenceRef, or physical device state. Those must
+be verified by the integrating host and the domain runtime. This helper also
+does **not** implement durable cross-process recovery: a production recovery
+workflow still requires a persisted job/attempt journal, actor/lease control,
+idempotency keys, checkpoint durability, device read-back and human escalation
+where appropriate. Do not reconstruct an uncertain transaction by blindly
+calling `execute()` again.
+
 ## Adapter Policy isolation
 
 Adapter-owned Policy providers are Host-bound to their Adapter identity. They are evaluated only when `PolicyInput.adapterId` selects that Adapter. Provider IDs are namespaced by the Host to avoid collisions between different Adapters using the same local policy name.
