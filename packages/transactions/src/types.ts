@@ -19,7 +19,8 @@ export type TransactionState =
   | "rolling_back"
   | "rolled_back"
   | "partially_applied"
-  | "cancelled";
+  | "cancelled"
+  | "execution_uncertain";
 
 export type TransactionMode = "atomic" | "compensating" | "best_effort";
 
@@ -67,6 +68,7 @@ export type TransactionFailureCode =
   | "artifact_unavailable"
   | "audit_unavailable"
   | "execution_failed"
+  | "execution_uncertain"
   | "verification_failed"
   | "commit_failed"
   | "rollback_failed"
@@ -148,6 +150,11 @@ export interface TransactionRuntimeOptions {
     transaction: TransactionRecord,
   ) => Promise<void> | void;
   readonly allowWithoutPolicy?: boolean;
+  /**
+   * Opt-in conservative status for failures after an effect may have started.
+   * Does not imply an automatic retry or rollback. Legacy is the current default.
+   */
+  readonly effectFailureMode?: "legacy" | "uncertain";
   readonly idFactory?: () => string;
   readonly now?: () => string;
 }
