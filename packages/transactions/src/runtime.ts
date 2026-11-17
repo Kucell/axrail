@@ -26,6 +26,7 @@ const TERMINAL_STATES = new Set<TransactionState>([
   "rolled_back",
   "partially_applied",
   "cancelled",
+  "execution_uncertain",
 ]);
 
 export class TransactionRuntime {
@@ -256,7 +257,7 @@ export class TransactionHandle {
     try {
       this.applyResult = await this.options.executor.apply(this.snapshot());
     } catch (error) {
-      await this.fail("execution_failed", transactionMessage(error), error);
+      await this.failAfterEffect("execution_failed", error);
       throw error;
     }
   }
@@ -269,11 +270,13 @@ export class TransactionHandle {
     try {
       const verified = await this.options.executor.verify(this.snapshot(), this.applyResult ?? {});
       if (!verified) {
-        await this.fail("verification_failed", "Transaction verification failed");
+        await this.failAfterEffect("verification_failed", new Error("Transaction verification failed"));
         throw new TransactionError("verification_failed", "Transaction verification failed");
       }
     } catch (error) {
-      if (this.record.state !== "failed") await this.fail("verification_failed", transactionMessage(error), error);
+      if (this.record.state !== "failed" && this.record.state !== "execution_uncertain") {
+        await this.failAfterEffect("verification_failed", error);
+      }
       throw error;
     }
   }
@@ -293,7 +296,7 @@ export class TransactionHandle {
       await this.options.executor.commit?.(this.snapshot(), this.applyResult ?? {});
       await this.transition("committed");
     } catch (error) {
-      await this.fail("commit_failed", transactionMessage(error), error);
+      await this.failAfterEffect("commit_failed", error);
       throw error;
     }
   }
@@ -384,6 +387,25 @@ export class TransactionHandle {
   private async reject(code: TransactionFailureCode, message: string): Promise<void> {
     this.record.error = { code, message };
     await this.transition("rejected", this.record.error);
+  }
+
+  /**
+   * The external effect may have succeeded even when acknowledgement or
+   * verification failed. Conservative mode preserves that uncertainty, leaving
+   * read-back and recovery to the owning Adapter; it never retries effects.
+   */
+  private async failAfterEffect(code: TransactionFailureCode, cause: unknown): Promise<void> {
+    const message = transactionMessage(cause);
+    if (this.options.effectFailureMode === "uncertain") {
+      this.record.error = {
+        code: "execution_uncertain",
+        message: `External effect outcome uncertain during ${code}: ${message}`,
+        cause,
+      };
+      await this.transition("execution_uncertain", { phase: code });
+    } else {
+      await this.fail(code, message, cause);
+    }
   }
 
   private async fail(code: TransactionFailureCode, message: string, cause?: unknown): Promise<void> {
