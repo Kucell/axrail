@@ -58,6 +58,7 @@ export interface HarnessRuntimeOptions {
 export interface HarnessTransactionRuntimeOptions {
   readonly executor: TransactionExecutor;
   readonly allowWithoutPolicy?: boolean;
+  readonly effectFailureMode?: TransactionRuntimeOptions["effectFailureMode"];
   readonly requiredApprovers?: readonly ApprovalRequirement[];
   readonly onEvent?: TransactionRuntimeOptions["onEvent"];
 }
@@ -156,6 +157,7 @@ export class HarnessRuntime {
       policy,
       approval,
       allowWithoutPolicy: options.allowWithoutPolicy,
+      effectFailureMode: options.effectFailureMode,
       idFactory: () => this.nextId("tx"),
       now: this.now,
       validate: (changeSet, transaction) =>
@@ -217,6 +219,7 @@ export class HarnessRuntime {
     const runtime = this.createTransactionRuntime({
       executor: options.executor,
       allowWithoutPolicy: options.allowWithoutPolicy,
+      effectFailureMode: options.effectFailureMode,
       requiredApprovers: options.requiredApprovers,
       onEvent: options.onEvent,
     });
